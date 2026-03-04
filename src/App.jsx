@@ -123,6 +123,21 @@ function gridToHitArray(grid) {
   return grid.map(r => r.map(c => c))
 }
 
+function inferAllPlacements(grid) {
+  const placements = {}
+  SHIPS.forEach(ship => {
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (grid[r][c] === ship.id && !placements[ship.id]) {
+          const dir = (c + 1 < GRID && grid[r][c + 1] === ship.id) ? 'H' : 'V'
+          placements[ship.id] = { row: r, col: c, dir }
+        }
+      }
+    }
+  })
+  return placements
+}
+
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap');
@@ -351,12 +366,7 @@ const CSS = `
     background: rgba(4,18,38,0.6);
   }
   .grid-cell:hover { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.3); }
-  .grid-cell.ship { background: rgba(13,74,133,0.7); border-color: rgba(0,212,255,0.3); }
-  .grid-cell.ship::after {
-    content: ''; position: absolute; inset: 2px;
-    background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,100,180,0.1));
-    border-radius: 2px;
-  }
+  .grid-cell.ship { background: transparent; border-color: rgba(0,212,255,0.1); }
   .grid-cell.preview-ok { background: rgba(0,212,255,0.15) !important; border-color: rgba(0,212,255,0.5) !important; }
   .grid-cell.preview-bad { background: rgba(255,56,56,0.15) !important; border-color: rgba(255,56,56,0.4) !important; }
   .grid-cell.hit {
@@ -591,6 +601,15 @@ const CSS = `
 
   /* COPY BTN */
   .copy-hint { font-family: var(--mono); font-size: 10px; color: var(--dim); text-align: center; margin-top: -4px; }
+  .btn-whatsapp {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; margin-top: 10px; padding: 9px 16px;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #fff; border: none; border-radius: 8px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    cursor: pointer; text-decoration: none; transition: filter 0.2s, transform 0.15s;
+  }
+  .btn-whatsapp:hover { filter: brightness(1.15); transform: translateY(-1px); }
 
   .flex-row { display: flex; gap: 10px; align-items: center; }
   .flex-col { display: flex; flex-direction: column; gap: 8px; }
@@ -613,8 +632,167 @@ const CSS = `
   .progress-fill.red { background: linear-gradient(90deg, var(--red), #ff8c42); }
 `
 
+// ── Ship SVG graphics (warship top-down style) ────────────────────────────────
+function ShipShape({ shipId, size, x, y, dir, sunk }) {
+  const C = 36, L = size * C
+  const t = dir === 'H' ? `translate(${x},${y})` : `translate(${x},${y + L}) rotate(-90)`
+
+  // Color palette
+  const h  = sunk ? '#180303' : '#0b2e52'   // hull
+  const d  = sunk ? '#2e0606' : '#0e3d6e'   // deck
+  const s2 = sunk ? '#4a0a0a' : '#144e87'   // superstructure
+  const ac = sunk ? '#bb1515' : '#00c8f8'   // accent / edge
+  const lt = sunk ? '#e84040' : '#6ddbff'   // lights / barrels
+  const op = sunk ? 0.6 : 1
+
+  // Hull profiles per ship type
+  const hullPath = {
+    carrier:    `M 4,9 L ${L-12},7 L ${L-3},11 L ${L-1},18 L ${L-3},25 L ${L-12},29 L 4,27 L 2,18 Z`,
+    battleship: `M 4,10 L ${L-14},8 L ${L-5},12 L ${L-1},18 L ${L-5},24 L ${L-14},28 L 4,26 L 1,18 Z`,
+    cruiser:    `M 4,11 L ${L-12},9 L ${L-3},13 L ${L-1},18 L ${L-3},23 L ${L-12},27 L 4,25 L 2,18 Z`,
+    submarine:  `M 8,13 Q 16,9 ${L/2},9 Q ${L-6},9 ${L-1},18 Q ${L-6},27 ${L/2},27 Q 16,27 8,23 Z`,
+    destroyer:  `M 4,12 L ${L-10},10 L ${L-2},14 L ${L-1},18 L ${L-2},22 L ${L-10},26 L 4,24 L 2,18 Z`,
+  }[shipId] || `M 3,10 L ${L-10},8 L ${L-1},18 L ${L-10},28 L 3,26 L 1,18 Z`
+
+  // Inner deck plate
+  const deckPath = {
+    carrier:    `M 10,12 L ${L-14},10 L ${L-5},14 L ${L-4},22 L ${L-14},26 L 10,24 Z`,
+    battleship: `M 10,13 L ${L-18},11 L ${L-8},15 L ${L-7},21 L ${L-18},25 L 10,23 Z`,
+    cruiser:    `M 9,14 L ${L-14},12 L ${L-6},15 L ${L-5},21 L ${L-14},24 L 9,22 Z`,
+    submarine:  null,
+    destroyer:  `M 8,14 L ${L-12},12 L ${L-5},15 L ${L-4},21 L ${L-12},24 L 8,22 Z`,
+  }[shipId]
+
+  const mX = L / 2
+
+  const Details = () => {
+    if (shipId === 'carrier') {
+      const isX = Math.round(L * 0.58)
+      return <>
+        {/* Angled flight deck */}
+        <polygon points={`12,10 ${L-15},10 ${L-15},22 70,22 55,14`} fill={s2} opacity={0.9} />
+        {/* Runway centerline */}
+        <line x1={60} y1={16} x2={L-17} y2={16} stroke={lt} strokeWidth={0.8} strokeDasharray="6,4" opacity={0.6}/>
+        {/* Island superstructure */}
+        <rect x={isX} y={8} width={20} height={12} rx={1} fill={s2} stroke={ac} strokeWidth={0.8}/>
+        <rect x={isX+3} y={5} width={6} height={4} rx={1} fill={h}/>
+        <line x1={isX+6} y1={5} x2={isX+6} y2={2} stroke={ac} strokeWidth={0.9}/>
+        <circle cx={isX+6} cy={2} r={1.8} fill={ac}/>
+        {/* Deck edge lights */}
+        {[16,30,44,58].map(cx => <circle key={cx} cx={cx} cy={11} r={1.2} fill={lt} opacity={0.8}/>)}
+        {/* Elevator */}
+        <rect x={18} y={12} width={8} height={9} rx={0.5} fill={h} stroke={ac} strokeWidth={0.5} opacity={0.7}/>
+      </>
+    }
+    if (shipId === 'battleship') {
+      return <>
+        {/* Rear twin turret */}
+        <rect x={12} y={12} width={18} height={12} rx={2} fill={s2} stroke={ac} strokeWidth={0.7}/>
+        <rect x={10} y={15.5} width={4} height={2} rx={0.5} fill={lt}/>
+        <rect x={10} y={18.5} width={4} height={2} rx={0.5} fill={lt}/>
+        {/* Bridge tower */}
+        <rect x={mX-11} y={10} width={20} height={16} rx={2} fill={s2} stroke={ac} strokeWidth={0.9}/>
+        <rect x={mX-7} y={7} width={12} height={6} rx={1} fill={h}/>
+        <rect x={mX-3} y={4} width={6} height={4} rx={1} fill={s2}/>
+        <line x1={mX} y1={4} x2={mX} y2={1} stroke={ac} strokeWidth={0.9}/>
+        <circle cx={mX} cy={1} r={2} fill={ac}/>
+        {/* Front twin turret */}
+        <rect x={L-30} y={12} width={18} height={12} rx={2} fill={s2} stroke={ac} strokeWidth={0.7}/>
+        <rect x={L-14} y={15.5} width={4} height={2} rx={0.5} fill={lt}/>
+        <rect x={L-14} y={18.5} width={4} height={2} rx={0.5} fill={lt}/>
+        {/* Smoke funnels */}
+        <ellipse cx={mX-16} cy={18} rx={3} ry={4} fill={h} stroke={ac} strokeWidth={0.5}/>
+        <ellipse cx={mX+16} cy={18} rx={3} ry={4} fill={h} stroke={ac} strokeWidth={0.5}/>
+      </>
+    }
+    if (shipId === 'cruiser') {
+      return <>
+        {/* Rear deck gun */}
+        <rect x={10} y={13} width={14} height={10} rx={2} fill={s2} stroke={ac} strokeWidth={0.7}/>
+        <rect x={8} y={16.5} width={4} height={2} rx={0.5} fill={lt}/>
+        {/* Bridge */}
+        <rect x={mX-10} y={10} width={18} height={16} rx={2} fill={s2} stroke={ac} strokeWidth={0.8}/>
+        <rect x={mX-6} y={7} width={10} height={5} rx={1} fill={h}/>
+        <line x1={mX-1} y1={7} x2={mX-1} y2={3} stroke={ac} strokeWidth={0.9}/>
+        <circle cx={mX-1} cy={3} r={1.8} fill={ac}/>
+        {/* Front gun turret */}
+        <rect x={L-26} y={13} width={14} height={10} rx={2} fill={s2} stroke={ac} strokeWidth={0.7}/>
+        <rect x={L-14} y={16} width={5} height={2} rx={0.5} fill={lt}/>
+        {/* Funnel */}
+        <ellipse cx={mX-14} cy={18} rx={3} ry={4} fill={h} stroke={ac} strokeWidth={0.5}/>
+      </>
+    }
+    if (shipId === 'submarine') {
+      return <>
+        {/* Pressure hull shading */}
+        <ellipse cx={mX} cy={18} rx={L/2-10} ry={7} fill={s2} opacity={0.6}/>
+        {/* Conning tower (sail) */}
+        <rect x={mX-11} y={11} width={16} height={11} rx={3} fill={s2} stroke={ac} strokeWidth={0.8}/>
+        <rect x={mX-8} y={8} width={10} height={5} rx={2} fill={h}/>
+        {/* Periscope + scope head */}
+        <line x1={mX-4} y1={8} x2={mX-4} y2={3} stroke={ac} strokeWidth={1.2}/>
+        <line x1={mX-8} y1={3} x2={mX} y2={3} stroke={ac} strokeWidth={1.2}/>
+        <circle cx={mX-8} cy={3} r={2} fill={lt} opacity={0.9}/>
+        {/* Diving planes */}
+        <polygon points={`4,14 12,14 12,22 4,22`} fill={s2} opacity={0.8}/>
+        <polygon points={`${L-14},14 ${L-6},14 ${L-6},22 ${L-14},22`} fill={s2} opacity={0.8}/>
+        {/* Propeller hint */}
+        <ellipse cx={5} cy={18} rx={2} ry={4} fill={s2} stroke={ac} strokeWidth={0.5}/>
+      </>
+    }
+    if (shipId === 'destroyer') {
+      return <>
+        {/* Rear deck */}
+        <rect x={6} y={13} width={L-18} height={10} rx={1} fill={s2} opacity={0.7}/>
+        {/* Main gun */}
+        <rect x={mX-6} y={12} width={14} height={12} rx={2} fill={s2} stroke={ac} strokeWidth={0.7}/>
+        <rect x={mX+6} y={16} width={8} height={2} rx={0.5} fill={lt}/>
+        {/* Bridge */}
+        <rect x={mX-18} y={12} width={10} height={12} rx={1} fill={s2} stroke={ac} strokeWidth={0.6}/>
+        <rect x={mX-16} y={10} width={6} height={4} rx={1} fill={h}/>
+        <line x1={mX-13} y1={10} x2={mX-13} y2={7} stroke={ac} strokeWidth={0.8}/>
+        {/* Torpedo tubes */}
+        <rect x={L-18} y={14} width={8} height={3} rx={1} fill={h} stroke={ac} strokeWidth={0.4}/>
+        <rect x={L-18} y={19} width={8} height={3} rx={1} fill={h} stroke={ac} strokeWidth={0.4}/>
+      </>
+    }
+    return null
+  }
+
+  return (
+    <g transform={t} opacity={op}>
+      {/* Hull base */}
+      <path d={hullPath} fill={h} stroke={ac} strokeWidth={1.4} strokeLinejoin="round"/>
+      {/* Deck plate */}
+      {deckPath && <path d={deckPath} fill={d} opacity={0.9}/>}
+      {/* Details */}
+      <Details/>
+      {/* Waterline highlight */}
+      <path d={hullPath} fill="none" stroke={lt} strokeWidth={0.4} opacity={0.25}/>
+    </g>
+  )
+}
+
+function ShipOverlay({ shipPlacements, hits, grid }) {
+  const CELL = 36, HDR = 24, SZ = HDR + GRID * CELL
+  return (
+    <svg width={SZ} height={SZ}
+      style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+      {Object.entries(shipPlacements).map(([shipId, { row, col, dir }]) => {
+        const ship = SHIPS.find(s => s.id === shipId)
+        if (!ship) return null
+        const sunk = hits && grid ? checkSunk(shipId, grid, hits) : false
+        return (
+          <ShipShape key={shipId} shipId={shipId} size={ship.size}
+            x={HDR + col * CELL} y={HDR + row * CELL} dir={dir} sunk={sunk}/>
+        )
+      })}
+    </svg>
+  )
+}
+
 // ── Grid component ────────────────────────────────────────────────────────────
-function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip }) {
+function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements }) {
   // mode: 'placement' | 'my-board' | 'enemy-board'
   const getCellClass = (r, c) => {
     const classes = ['grid-cell']
@@ -650,31 +828,35 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
     return classes.join(' ')
   }
 
+  const hasShips = shipPlacements && Object.keys(shipPlacements).length > 0
   return (
-    <table className="grid-table">
-      <thead>
-        <tr>
-          <th className="grid-row-header" />
-          {cols.map(c => <th key={c} className="grid-col-header">{c}</th>)}
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({ length: GRID }, (_, r) => (
-          <tr key={r}>
-            <td className="grid-row-header">{r + 1}</td>
-            {Array.from({ length: GRID }, (_, c) => (
-              <td
-                key={c}
-                className={getCellClass(r, c)}
-                onClick={() => onCellClick?.(r, c)}
-                onMouseEnter={() => onCellHover?.(r, c)}
-                onMouseLeave={() => onCellHover?.(null, null)}
-              />
-            ))}
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      {hasShips && <ShipOverlay shipPlacements={shipPlacements} hits={hits} grid={grid}/>}
+      <table className="grid-table">
+        <thead>
+          <tr>
+            <th className="grid-row-header" />
+            {cols.map(c => <th key={c} className="grid-col-header">{c}</th>)}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {Array.from({ length: GRID }, (_, r) => (
+            <tr key={r}>
+              <td className="grid-row-header">{r + 1}</td>
+              {Array.from({ length: GRID }, (_, c) => (
+                <td
+                  key={c}
+                  className={getCellClass(r, c)}
+                  onClick={() => onCellClick?.(r, c)}
+                  onMouseEnter={() => onCellHover?.(r, c)}
+                  onMouseLeave={() => onCellHover?.(null, null)}
+                />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -799,12 +981,11 @@ export default function App() {
           if (isHit) {
             const shipId = prev[r][c]
             const sunk = checkSunk(shipId, prev, newH)
-            const result = { hit: isHit, miss: !isHit, sunk: sunk ? shipId : null }
-            send({ type: 'shot-result', r, c, ...result, shipGrid: sunk ? prev : null })
+            send({ type: 'shot-result', r, c, hit: true, miss: false, sunk: sunk ? shipId : null, shipGrid: sunk ? prev : null })
             AudioEngine.init(); AudioEngine.play(sunk ? 'sink' : 'hit')
-            addLog(`Enemy hit ${cols[c]}${r+1}${sunk ? ' — ${shipId.toUpperCase()} SUNK!' : '!'}`, sunk ? 'sunk' : 'hit')
+            addLog(`Enemy hit ${cols[c]}${r+1}${sunk ? ` — ${shipId.toUpperCase()} SUNK!` : '!'}`, sunk ? 'sunk' : 'hit')
             setStats(s => ({ ...s, mySunk: s.mySunk + (sunk ? 1 : 0) }))
-            // Check if all my ships sunk
+            // Hit: enemy keeps shooting — don't flip myTurn
             if (sunk) {
               setTimeout(() => {
                 if (allSunk(prev, newH)) {
@@ -818,12 +999,13 @@ export default function App() {
             send({ type: 'shot-result', r, c, hit: false, miss: true, sunk: null })
             AudioEngine.init(); AudioEngine.play('miss')
             addLog(`Enemy missed ${cols[c]}${r+1}`, 'miss')
+            setMyTurn(true) // miss → now it's my turn
           }
           return newH
         })
         return prev
       })
-      setMyTurn(true) // opponent shot, now my turn
+      // removed unconditional setMyTurn(true) — handled per-outcome above
     }
     if (data.type === 'shot-result') {
       // Result of my shot
@@ -836,20 +1018,22 @@ export default function App() {
       if (sunk && shipGrid) {
         setEnemyShipGrid(shipGrid)
         AudioEngine.init(); AudioEngine.play('sink')
-        addLog(`💥 You sank their ${sunk.toUpperCase()}!`, 'sunk')
-        showToast(`ENEMY ${sunk.toUpperCase()} SUNK!`, 'sunk')
-        setStats(s => ({ ...s, enemySunk: s.enemySunk + 1 }))
+        addLog(`💥 You sank their ${sunk.toUpperCase()}! Fire again!`, 'sunk')
+        showToast(`${sunk.toUpperCase()} SUNK! KEEP FIRING!`, 'sunk')
+        setStats(s => ({ ...s, enemySunk: s.enemySunk + 1, myHitsCount: s.myHitsCount + 1 }))
+        setMyTurn(true) // hit → keep shooting
       } else if (hit) {
         AudioEngine.init(); AudioEngine.play('hit')
-        addLog(`Hit at ${cols[c]}${r+1}!`, 'hit')
-        showToast('DIRECT HIT!', 'hit')
+        addLog(`Hit at ${cols[c]}${r+1}! Fire again!`, 'hit')
+        showToast('DIRECT HIT! FIRE AGAIN!', 'hit')
         setStats(s => ({ ...s, myHitsCount: s.myHitsCount + 1 }))
+        setMyTurn(true) // hit → keep shooting
       } else {
         AudioEngine.init(); AudioEngine.play('miss')
         addLog(`Missed ${cols[c]}${r+1}`, 'miss')
-        showToast('MISS', 'miss')
+        showToast('MISS — ENEMY TURN', 'miss')
+        // miss → enemy's turn (myTurn stays false)
       }
-      setMyTurn(false) // sent my shot, now enemy's turn
     }
     if (data.type === 'game-over') {
       if (data.winner === 'enemy') {
@@ -998,8 +1182,32 @@ export default function App() {
     }
   }, [connected])
 
+  // Auto-join from URL param (?join=CODE)
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('join')?.toUpperCase()
+    if (!code || peerRef.current) return
+    setInputCode(code)
+    setIsHost(false)
+    setConnError('')
+    const peer = new Peer(null, {
+      host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0,
+      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+    })
+    peerRef.current = peer
+    peer.on('open', () => {
+      const conn = peer.connect(code, { reliable: true })
+      setupConn(conn, false)
+    })
+    peer.on('error', e => setConnError('Could not connect: ' + e.message))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── RENDER ──
   const accuracy = stats.myShots > 0 ? Math.round((stats.myHitsCount / stats.myShots) * 100) : 0
+  const myShipPlacements = inferAllPlacements(myGrid)
+  const enemyShipPlacements = inferAllPlacements(enemyShipGrid)
+  const gameUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}`
+    : ''
 
   return (
     <div className="app">
@@ -1058,6 +1266,16 @@ export default function App() {
                 <>
                   <div className="room-code-display" onClick={copyCode} title="Click to copy">{roomCode}</div>
                   <div className="copy-hint">Click code to copy · Share with opponent</div>
+                  <a
+                    className="btn-whatsapp"
+                    href={`https://wa.me/?text=${encodeURIComponent(`⚓ Join my Naval Strike battle!\nTap to join instantly: ${gameUrl}?join=${roomCode}`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                    INVITE VIA WHATSAPP
+                  </a>
                   <div className="waiting-msg mt-8">
                     {connected ? '✅ Opponent connected!' : '⏳ Waiting for opponent to join...'}
                   </div>
@@ -1170,6 +1388,7 @@ export default function App() {
                   hoverDirection={direction}
                   onCellClick={handlePlacementClick}
                   onCellHover={(r, c) => r !== null ? setHoveredCell([r, c]) : setHoveredCell(null)}
+                  shipPlacements={myShipPlacements}
                 />
               </div>
               <div className="text-small" style={{ textAlign: 'center' }}>
@@ -1222,6 +1441,7 @@ export default function App() {
                 grid={myGrid}
                 hits={myHits}
                 mode="my-board"
+                shipPlacements={myShipPlacements}
               />
               <div className="ship-status-row">
                 {SHIPS.map(s => {
@@ -1244,6 +1464,7 @@ export default function App() {
                 hits={enemyHits}
                 mode="enemy-board"
                 onCellClick={myTurn ? handleShot : undefined}
+                shipPlacements={enemyShipPlacements}
               />
               <div className="ship-status-row">
                 {SHIPS.map(s => {
