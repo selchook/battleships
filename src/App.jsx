@@ -1411,19 +1411,19 @@ export default function App() {
               })}
 
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <button className="orient-btn" style={{ marginTop: 0 }} onClick={() => setDirection(d => d === 'H' ? 'V' : 'H')}>
+                <button className="orient-btn" onClick={() => setDirection(d => d === 'H' ? 'V' : 'H')}>
                   Rotate: {direction === 'H' ? '↔ Horizontal' : '↕ Vertical'} (R)
                 </button>
                 <button className="btn btn-primary btn-sm btn-full" onClick={handleRandomPlace}>🎲 Random Place</button>
                 <button className="btn btn-danger btn-sm btn-full" onClick={handleReset}>↺ Reset</button>
                 <button className="btn btn-sm btn-full" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--dim)', border: '1px solid rgba(255,255,255,0.15)' }} onClick={startNewGame}>← Lobby</button>
                 {myReady ? (
-                  <div className="waiting-msg" style={{ textAlign: 'center', padding: '10px 0' }}>
+                  <div className="waiting-msg" style={{ textAlign: 'center', padding: '8px 0' }}>
                     {opponentReady ? '⚔️ Starting...' : '⏳ Waiting for opponent...'}
                   </div>
                 ) : (
                   <button
-                    className="btn btn-gold btn-full"
+                    className="btn btn-gold btn-sm btn-full"
                     onClick={handleReady}
                     disabled={placedShips.length < SHIPS.length}
                     style={{ opacity: placedShips.length < SHIPS.length ? 0.3 : 1 }}
