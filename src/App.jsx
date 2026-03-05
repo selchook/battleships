@@ -558,6 +558,32 @@ const CSS = `
   .stat-num { font-size: 32px; font-weight: 700; color: var(--cyan); }
   .stat-label { font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: 2px; }
 
+  /* WATER SPLASH */
+  @keyframes waterRipple {
+    0%   { transform: translate(-50%,-50%) scale(0);   opacity: 0.9; }
+    60%  { opacity: 0.6; }
+    100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; }
+  }
+  @keyframes waterDrop {
+    0%   { transform: translateY(-160%) scale(0.6); opacity: 1; }
+    60%  { transform: translateY(-20%)  scale(1.1); opacity: 1; }
+    100% { transform: translateY(0%)   scale(0.8); opacity: 0; }
+  }
+  .grid-cell.splash-anim::before {
+    content: '';
+    position: absolute; top: 50%; left: 50%;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,200,255,0.75) 0%, rgba(0,130,220,0.35) 45%, transparent 70%);
+    pointer-events: none; z-index: 3;
+    animation: waterRipple 0.65s ease-out forwards;
+  }
+  .grid-cell.splash-anim .water-drop {
+    position: absolute; top: 50%; left: 50%;
+    font-size: 14px; pointer-events: none; z-index: 4;
+    animation: waterDrop 0.55s ease-in forwards;
+  }
+
   /* RADAR PING */
   .radar-ping {
     position: absolute; inset: 0; pointer-events: none; z-index: 5;
@@ -825,7 +851,7 @@ function ShipOverlay({ shipPlacements, hits, grid, cell, hdr }) {
 }
 
 // ── Grid component ────────────────────────────────────────────────────────────
-function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements }) {
+function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements, splashCells }) {
   // mode: 'placement' | 'my-board' | 'enemy-board'
   const tableRef = useRef(null)
   const [dims, setDims] = useState({ cell: 36, hdr: 24 })
@@ -876,6 +902,7 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
       classes.push('my-turn-hover')
       if (h) classes.push('already-shot')
     }
+    if (splashCells?.some(s => s.r === r && s.c === c)) classes.push('splash-anim')
     return classes.join(' ')
   }
 
@@ -901,7 +928,9 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
                   onClick={() => onCellClick?.(r, c)}
                   onMouseEnter={() => onCellHover?.(r, c)}
                   onMouseLeave={() => onCellHover?.(null, null)}
-                />
+                >
+                  {splashCells?.some(s => s.r === r && s.c === c) && <span className="water-drop">💧</span>}
+                </td>
               ))}
             </tr>
           ))}
@@ -942,6 +971,14 @@ export default function App() {
   const [stats, setStats] = useState({ myShots: 0, myHitsCount: 0, enemySunk: 0, mySunk: 0 })
   const [myRematch, setMyRematch] = useState(false)
   const [opponentRematch, setOpponentRematch] = useState(false)
+
+  const [splashCells, setSplashCells] = useState([]) // { r, c, id, board: 'my'|'enemy' }
+
+  const triggerSplash = useCallback((r, c, board) => {
+    const id = Date.now() + Math.random()
+    setSplashCells(prev => [...prev, { r, c, id, board }])
+    setTimeout(() => setSplashCells(prev => prev.filter(s => s.id !== id)), 700)
+  }, [])
 
   const peerRef = useRef(null)
   const connRef = useRef(null)
