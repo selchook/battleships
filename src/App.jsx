@@ -581,7 +581,10 @@ const CSS = `
     .grid-col-header, .grid-row-header { width: 18px; height: 18px; font-size: 8px; }
     .boards-row { gap: 12px; }
     .placement-layout { gap: 16px; }
-    .battle-hud { flex-direction: column; gap: 8px; text-align: center; }
+    .battle-hud { flex-direction: column; gap: 8px; text-align: center; order: 2; }
+    .battle-stats { order: 3; }
+    .boards-row { order: 1; }
+    .battle-log { order: 4; }
     .end-stats { gap: 20px; }
   }
   @media (max-width: 400px) {
@@ -1506,7 +1509,7 @@ export default function App() {
           </div>
 
           {/* Stats bar */}
-          <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="battle-stats" style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap' }}>
             <div className="text-small">SHOTS: <span className="text-cyan">{stats.myShots}</span></div>
             <div className="text-small">HITS: <span className="text-gold">{stats.myHitsCount}</span></div>
             <div className="text-small">ACCURACY: <span className={accuracy >= 50 ? 'text-green' : 'text-cyan'}>{accuracy}%</span></div>
