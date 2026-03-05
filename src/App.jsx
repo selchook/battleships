@@ -523,8 +523,11 @@ const CSS = `
 
   /* END SCREEN */
   .end-screen {
-    flex: 1; display: flex; flex-direction: column; align-items: center;
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 24px; padding: 40px;
+    background: rgba(2,12,24,0.93); backdrop-filter: blur(10px);
+    overflow-y: auto;
   }
   .end-result {
     font-size: clamp(40px,8vw,80px); font-weight: 900; letter-spacing: 6px; text-align: center;
