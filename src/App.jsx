@@ -1169,6 +1169,15 @@ export default function App() {
     setMyRematch(true)
   }
 
+  // Winner-side game-over: when all enemy ships sunk locally, go to end screen
+  useEffect(() => {
+    if (screen === 'battle' && stats.enemySunk >= SHIPS.length) {
+      setEndResult('win')
+      setScreen('end')
+      AudioEngine.init(); AudioEngine.play('win')
+    }
+  }, [stats.enemySunk, screen])
+
   // When both players requested rematch → reset and go to placement
   useEffect(() => {
     if (!myRematch || !opponentRematch) return
