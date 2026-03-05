@@ -1565,24 +1565,24 @@ export default function App() {
             <button
               className="btn btn-primary"
               onClick={handleRematch}
-              disabled={myRematch || !connected}
-              style={{ padding: '14px 32px', fontSize: 13 }}
+              disabled={myRematch}
+              style={{ padding: '14px 32px', fontSize: 14, minWidth: 160 }}
             >
               {myRematch
-                ? (opponentRematch ? '⚔️ Starting...' : '⏳ Waiting for opponent...')
+                ? (opponentRematch ? '⚔️ Starting...' : '⏳ Waiting...')
                 : '🔄 REMATCH'}
             </button>
-            <button className="btn btn-gold" onClick={startNewGame} style={{ padding: '14px 32px', fontSize: 13 }}>
+            <button className="btn btn-gold" onClick={startNewGame} style={{ padding: '14px 32px', fontSize: 14, minWidth: 160 }}>
               ⚓ PLAY AGAIN
             </button>
           </div>
           {myRematch && !opponentRematch && (
-            <div className="text-small" style={{ textAlign: 'center', marginTop: -12 }}>
-              Opponent hasn't accepted yet...
+            <div className="text-small" style={{ textAlign: 'center', color: 'var(--dim)' }}>
+              Waiting for opponent to accept...
             </div>
           )}
           {!myRematch && opponentRematch && (
-            <div className="text-small text-gold" style={{ textAlign: 'center', marginTop: -12, animation: 'fadeInOut 1.5s infinite' }}>
+            <div className="text-small text-gold" style={{ textAlign: 'center', fontWeight: 700, letterSpacing: 1 }}>
               ⚔️ Opponent wants a rematch!
             </div>
           )}
