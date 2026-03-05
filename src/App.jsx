@@ -579,14 +579,19 @@ const CSS = `
   @media (max-width: 700px) {
     .grid-cell { width: 28px; height: 28px; }
     .grid-col-header, .grid-row-header { width: 18px; height: 18px; font-size: 8px; }
-    .boards-row { gap: 12px; }
     .placement-layout { gap: 16px; }
-    .battle-hud { flex-direction: column; gap: 8px; text-align: center; order: 2; }
-    .battle-stats { order: 3; }
-    .boards-row { order: 1; }
-    .battle-log { order: 4; }
     .ship-panel { order: 2; }
     .grid-wrapper { order: 1; }
+    .battle-screen { height: calc(100dvh - 56px); overflow: hidden; padding: 6px 8px; gap: 6px; }
+    .battle-hud { flex-direction: column; gap: 4px; text-align: center; order: 2; padding: 8px 12px; }
+    .hud-value { font-size: 14px; }
+    .turn-indicator { padding: 6px 14px; font-size: 10px; }
+    .battle-stats { order: 3; display: none; }
+    .boards-row { order: 1; flex: 1; min-height: 0; overflow-y: auto; gap: 8px; }
+    .battle-log { order: 4; display: none; }
+    .board-panel { padding: 8px 10px; }
+    .board-title { margin-bottom: 6px; }
+    .ship-status-row { margin-top: 6px; gap: 4px; }
     .end-stats { gap: 20px; }
   }
   @media (max-width: 400px) {
