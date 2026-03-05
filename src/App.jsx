@@ -537,10 +537,13 @@ const CSS = `
     filter: drop-shadow(0 0 30px rgba(240,165,0,0.5));
   }
   .end-result.lose {
-    background: linear-gradient(135deg, var(--red), #888);
+    background: linear-gradient(135deg, var(--red), #cc2244, #880022);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    animation: loseGlow 1.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 30px rgba(220,50,50,0.5));
   }
   @keyframes winGlow { 0%,100%{filter:drop-shadow(0 0 20px rgba(240,165,0,0.4))} 50%{filter:drop-shadow(0 0 50px rgba(240,165,0,0.8))} }
+  @keyframes loseGlow { 0%,100%{filter:drop-shadow(0 0 20px rgba(220,50,50,0.4))} 50%{filter:drop-shadow(0 0 50px rgba(220,50,50,0.9))} }
 
   .end-stats {
     background: rgba(4,18,38,0.85); border: 1px solid rgba(0,212,255,0.2);
@@ -1240,7 +1243,10 @@ export default function App() {
   // ── RENDER ──
   const accuracy = stats.myShots > 0 ? Math.round((stats.myHitsCount / stats.myShots) * 100) : 0
   const myShipPlacements = inferAllPlacements(myGrid)
-  const enemyShipPlacements = inferAllPlacements(enemyShipGrid)
+  const allEnemyPlacements = inferAllPlacements(enemyShipGrid)
+  const enemyShipPlacements = Object.fromEntries(
+    Object.entries(allEnemyPlacements).filter(([shipId]) => checkSunk(shipId, enemyShipGrid, enemyHits))
+  )
   const gameUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}`
     : ''
@@ -1556,18 +1562,16 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {connected && (
-              <button
-                className="btn btn-primary"
-                onClick={handleRematch}
-                disabled={myRematch}
-                style={{ padding: '14px 32px', fontSize: 13 }}
-              >
-                {myRematch
-                  ? (opponentRematch ? '⚔️ Starting...' : '⏳ Waiting for opponent...')
-                  : '🔄 REMATCH'}
-              </button>
-            )}
+            <button
+              className="btn btn-primary"
+              onClick={handleRematch}
+              disabled={myRematch || !connected}
+              style={{ padding: '14px 32px', fontSize: 13 }}
+            >
+              {myRematch
+                ? (opponentRematch ? '⚔️ Starting...' : '⏳ Waiting for opponent...')
+                : '🔄 REMATCH'}
+            </button>
             <button className="btn btn-gold" onClick={startNewGame} style={{ padding: '14px 32px', fontSize: 13 }}>
               ⚓ PLAY AGAIN
             </button>
