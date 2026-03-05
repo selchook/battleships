@@ -104,11 +104,14 @@ function placeShip(grid, ship, row, col, dir) {
 }
 
 function checkSunk(shipId, shipGrid, hits) {
+  let found = false
   for (let r = 0; r < GRID; r++)
     for (let c = 0; c < GRID; c++)
-      if (shipGrid[r][c] === shipId && !(hits[r] && hits[r][c] === 'hit'))
-        return false
-  return true
+      if (shipGrid[r][c] === shipId) {
+        found = true
+        if (!(hits[r] && hits[r][c] === 'hit')) return false
+      }
+  return found
 }
 
 function countSunk(shipGrid, hits) {
