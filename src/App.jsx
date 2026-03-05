@@ -1089,6 +1089,7 @@ export default function App() {
             send({ type: 'shot-result', r, c, hit: false, miss: true, sunk: null })
             AudioEngine.init(); AudioEngine.play('miss')
             addLog(`Enemy missed ${cols[c]}${r+1}`, 'miss')
+            triggerSplash(r, c, 'my')
             setMyTurn(true) // miss → now it's my turn
           }
           return newH
@@ -1122,6 +1123,7 @@ export default function App() {
         AudioEngine.init(); AudioEngine.play('miss')
         addLog(`Missed ${cols[c]}${r+1}`, 'miss')
         showToast('MISS — ENEMY TURN', 'miss')
+        triggerSplash(r, c, 'enemy')
         // miss → enemy's turn (myTurn stays false)
       }
     }
