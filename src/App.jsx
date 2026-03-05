@@ -1137,7 +1137,7 @@ export default function App() {
     if (data.type === 'rematch') {
       setOpponentRematch(true)
     }
-  }, [send, addLog, showToast])
+  }, [send, addLog, showToast, triggerSplash])
 
   // Re-bind handleMessage on conn open since closure is stale
   useEffect(() => {
@@ -1582,6 +1582,7 @@ export default function App() {
                 hits={myHits}
                 mode="my-board"
                 shipPlacements={myShipPlacements}
+                splashCells={splashCells.filter(s => s.board === 'my')}
               />
               <div className="ship-status-row">
                 {SHIPS.map(s => {
@@ -1605,6 +1606,7 @@ export default function App() {
                 mode="enemy-board"
                 onCellClick={myTurn ? handleShot : undefined}
                 shipPlacements={enemyShipPlacements}
+                splashCells={splashCells.filter(s => s.board === 'enemy')}
               />
               <div className="ship-status-row">
                 {SHIPS.map(s => {
