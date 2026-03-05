@@ -892,6 +892,8 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [endResult, setEndResult] = useState(null) // 'win' | 'lose'
   const [stats, setStats] = useState({ myShots: 0, myHitsCount: 0, enemySunk: 0, mySunk: 0 })
+  const [myRematch, setMyRematch] = useState(false)
+  const [opponentRematch, setOpponentRematch] = useState(false)
 
   const peerRef = useRef(null)
   const connRef = useRef(null)
@@ -1045,6 +1047,9 @@ export default function App() {
         AudioEngine.init(); AudioEngine.play('win')
       }
     }
+    if (data.type === 'rematch') {
+      setOpponentRematch(true)
+    }
   }, [send, addLog, showToast])
 
   // Re-bind handleMessage on conn open since closure is stale
@@ -1155,6 +1160,34 @@ export default function App() {
     addLog(`You fired at ${cols[c]}${r+1}...`, 'info')
     setMyTurn(false) // wait for result
   }
+
+  const handleRematch = () => {
+    send({ type: 'rematch' })
+    setMyRematch(true)
+  }
+
+  // When both players requested rematch → reset and go to placement
+  useEffect(() => {
+    if (!myRematch || !opponentRematch) return
+    setMyGrid(makeEmptyGrid())
+    setPlacedShips([])
+    setSelectedShipIdx(0)
+    setHoveredCell(null)
+    setMyHits(makeEmptyGrid())
+    setEnemyHits(makeEmptyGrid())
+    setEnemyShipGrid(makeEmptyGrid())
+    setMyTurn(false)
+    setGameLog([])
+    setEffects([])
+    setEndResult(null)
+    setStats({ myShots: 0, myHitsCount: 0, enemySunk: 0, mySunk: 0 })
+    setMyReady(false)
+    setOpponentReady(false)
+    setMyRematch(false)
+    setOpponentRematch(false)
+    setScreen('placement')
+    addLog('Rematch started! Deploy your fleet.', 'system')
+  }, [myRematch, opponentRematch])
 
   const startNewGame = () => {
     setScreen('lobby')
@@ -1365,6 +1398,7 @@ export default function App() {
                 </button>
                 <button className="btn btn-primary btn-sm" onClick={handleRandomPlace}>🎲 Random Place</button>
                 <button className="btn btn-danger btn-sm" onClick={handleReset}>↺ Reset</button>
+                <button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--dim)', border: '1px solid rgba(255,255,255,0.15)' }} onClick={startNewGame}>← Lobby</button>
               </div>
 
               {placedShips.length === SHIPS.length && !myReady && (
@@ -1425,6 +1459,7 @@ export default function App() {
               <div className={`hud-value ${stats.enemySunk >= 4 ? 'danger' : ''}`}>
                 {SHIPS.length - stats.enemySunk}/{SHIPS.length}
               </div>
+              <button className="btn btn-sm" style={{ marginTop: 4, background: 'rgba(255,255,255,0.07)', color: 'var(--dim)', border: '1px solid rgba(255,255,255,0.15)', fontSize: 10 }} onClick={startNewGame}>← LOBBY</button>
             </div>
           </div>
 
@@ -1521,10 +1556,32 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {connected && (
+              <button
+                className="btn btn-primary"
+                onClick={handleRematch}
+                disabled={myRematch}
+                style={{ padding: '14px 32px', fontSize: 13 }}
+              >
+                {myRematch
+                  ? (opponentRematch ? '⚔️ Starting...' : '⏳ Waiting for opponent...')
+                  : '🔄 REMATCH'}
+              </button>
+            )}
             <button className="btn btn-gold" onClick={startNewGame} style={{ padding: '14px 32px', fontSize: 13 }}>
               ⚓ PLAY AGAIN
             </button>
           </div>
+          {myRematch && !opponentRematch && (
+            <div className="text-small" style={{ textAlign: 'center', marginTop: -12 }}>
+              Opponent hasn't accepted yet...
+            </div>
+          )}
+          {!myRematch && opponentRematch && (
+            <div className="text-small text-gold" style={{ textAlign: 'center', marginTop: -12, animation: 'fadeInOut 1.5s infinite' }}>
+              ⚔️ Opponent wants a rematch!
+            </div>
+          )}
         </div>
       )}
     </div>
