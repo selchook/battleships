@@ -577,26 +577,37 @@ const CSS = `
 
   /* RESPONSIVE */
   @media (max-width: 700px) {
-    .grid-cell { width: 28px; height: 28px; }
-    .grid-col-header, .grid-row-header { width: 18px; height: 18px; font-size: 8px; }
-    .placement-layout { gap: 16px; }
-    .ship-panel { order: 2; }
+    /* Header — compact so screens have more room */
+    .header { padding: 6px 12px; }
+    .logo { font-size: 14px; letter-spacing: 2px; }
+    .logo span { display: none; }
+    .header-status { font-size: 10px; }
+
+    /* Grid — smaller cells for placement & battle */
+    .grid-cell { width: 24px; height: 24px; }
+    .grid-col-header, .grid-row-header { width: 16px; height: 16px; font-size: 7px; }
+
+    /* Placement */
+    .placement-screen { padding: 6px 8px; gap: 6px; }
+    .placement-title { font-size: 11px; letter-spacing: 2px; }
+    .placement-layout { gap: 8px; }
+    .ship-panel { order: 2; padding: 10px 12px; min-width: 0; width: 100%; }
+    .ship-panel h4 { margin-bottom: 8px; }
+    .ship-item { padding: 5px 8px; margin-bottom: 3px; }
     .grid-wrapper { order: 1; }
-    .battle-screen { height: calc(100dvh - 56px); overflow: hidden; padding: 6px 8px; gap: 6px; }
+    .board-panel { padding: 8px 10px; }
+
+    /* Battle */
+    .battle-screen { height: calc(100dvh - 38px); overflow: hidden; padding: 6px 8px; gap: 6px; }
     .battle-hud { flex-direction: column; gap: 4px; text-align: center; order: 2; padding: 8px 12px; }
     .hud-value { font-size: 14px; }
     .turn-indicator { padding: 6px 14px; font-size: 10px; }
     .battle-stats { order: 3; display: none; }
     .boards-row { order: 1; flex: 1; min-height: 0; overflow-y: auto; gap: 8px; }
     .battle-log { order: 4; display: none; }
-    .board-panel { padding: 8px 10px; }
     .board-title { margin-bottom: 6px; }
     .ship-status-row { margin-top: 6px; gap: 4px; }
     .end-stats { gap: 20px; }
-  }
-  @media (max-width: 400px) {
-    .grid-cell { width: 24px; height: 24px; }
-    .grid-cell.hit::after, .grid-cell.sunk::after { font-size: 12px; }
   }
 
   /* NOTIFICATION TOAST */
