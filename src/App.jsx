@@ -1584,9 +1584,6 @@ export default function App() {
                 ? (opponentRematch ? '⚔️ Starting...' : '⏳ Waiting...')
                 : '🔄 REMATCH'}
             </button>
-            <button className="btn btn-gold" onClick={startNewGame} style={{ padding: '14px 32px', fontSize: 14, minWidth: 160 }}>
-              ⚓ PLAY AGAIN
-            </button>
           </div>
           {myRematch && !opponentRematch && (
             <div className="text-small" style={{ textAlign: 'center', color: 'var(--dim)' }}>
