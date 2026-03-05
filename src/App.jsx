@@ -1421,16 +1421,11 @@ export default function App() {
                   <div className="waiting-msg" style={{ textAlign: 'center', padding: '8px 0' }}>
                     {opponentReady ? '⚔️ Starting...' : '⏳ Waiting for opponent...'}
                   </div>
-                ) : (
-                  <button
-                    className="btn btn-gold btn-sm btn-full"
-                    onClick={handleReady}
-                    disabled={placedShips.length < SHIPS.length}
-                    style={{ opacity: placedShips.length < SHIPS.length ? 0.3 : 1 }}
-                  >
+                ) : placedShips.length === SHIPS.length ? (
+                  <button className="btn btn-gold btn-sm btn-full" onClick={handleReady}>
                     ✅ READY TO BATTLE
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
 
