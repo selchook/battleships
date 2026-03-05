@@ -69,6 +69,49 @@ const AudioEngine = {
         g.gain.setValueAtTime(0.3, now + t); g.gain.exponentialRampToValueAtTime(0.01, now + t + 0.4)
         o.start(now + t); o.stop(now + t + 0.4)
       })
+    } else if (type === 'splash') {
+      // Noise burst — shaped like rushing water
+      const dur = 0.7
+      const bufSize = Math.ceil(this.ctx.sampleRate * dur)
+      const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate)
+      const data = buf.getChannelData(0)
+      for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1
+      const noise = this.ctx.createBufferSource()
+      noise.buffer = buf
+      // Bandpass sweeping down — gives "sploosh" character
+      const bp = this.ctx.createBiquadFilter()
+      bp.type = 'bandpass'; bp.Q.value = 1.2
+      bp.frequency.setValueAtTime(1200, now)
+      bp.frequency.exponentialRampToValueAtTime(180, now + dur)
+      const ng = this.ctx.createGain()
+      ng.gain.setValueAtTime(1.2, now)
+      ng.gain.exponentialRampToValueAtTime(0.01, now + dur)
+      noise.connect(bp); bp.connect(ng); ng.connect(this.ctx.destination)
+      noise.start(now); noise.stop(now + dur)
+      // Low-frequency thud on impact
+      const thud = this.ctx.createOscillator()
+      const tg = this.ctx.createGain()
+      thud.connect(tg); tg.connect(this.ctx.destination)
+      thud.type = 'sine'
+      thud.frequency.setValueAtTime(90, now)
+      thud.frequency.exponentialRampToValueAtTime(28, now + 0.35)
+      tg.gain.setValueAtTime(0.9, now)
+      tg.gain.exponentialRampToValueAtTime(0.01, now + 0.35)
+      thud.start(now); thud.stop(now + 0.35)
+      // High fizz layer — spray droplets
+      const bufSize2 = Math.ceil(this.ctx.sampleRate * 0.4)
+      const buf2 = this.ctx.createBuffer(1, bufSize2, this.ctx.sampleRate)
+      const d2 = buf2.getChannelData(0)
+      for (let i = 0; i < bufSize2; i++) d2[i] = Math.random() * 2 - 1
+      const fizz = this.ctx.createBufferSource()
+      fizz.buffer = buf2
+      const hp = this.ctx.createBiquadFilter()
+      hp.type = 'highpass'; hp.frequency.value = 3000
+      const fg = this.ctx.createGain()
+      fg.gain.setValueAtTime(0.25, now + 0.05)
+      fg.gain.exponentialRampToValueAtTime(0.01, now + 0.4)
+      fizz.connect(hp); hp.connect(fg); fg.connect(this.ctx.destination)
+      fizz.start(now + 0.05); fizz.stop(now + 0.4)
     }
   }
 }
@@ -1087,7 +1130,7 @@ export default function App() {
             }
           } else {
             send({ type: 'shot-result', r, c, hit: false, miss: true, sunk: null })
-            AudioEngine.init(); AudioEngine.play('miss')
+            AudioEngine.init(); AudioEngine.play('splash')
             addLog(`Enemy missed ${cols[c]}${r+1}`, 'miss')
             triggerSplash(r, c, 'my')
             setMyTurn(true) // miss → now it's my turn
@@ -1120,7 +1163,7 @@ export default function App() {
         setStats(s => ({ ...s, myHitsCount: s.myHitsCount + 1 }))
         setMyTurn(true) // hit → keep shooting
       } else {
-        AudioEngine.init(); AudioEngine.play('miss')
+        AudioEngine.init(); AudioEngine.play('splash')
         addLog(`Missed ${cols[c]}${r+1}`, 'miss')
         showToast('MISS — ENEMY TURN', 'miss')
         triggerSplash(r, c, 'enemy')
@@ -1137,7 +1180,7 @@ export default function App() {
     if (data.type === 'rematch') {
       setOpponentRematch(true)
     }
-  }, [send, addLog, showToast, triggerSplash])
+  }, [send, addLog, showToast])
 
   // Re-bind handleMessage on conn open since closure is stale
   useEffect(() => {
