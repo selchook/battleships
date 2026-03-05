@@ -782,10 +782,13 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   )
 }
 
-function ShipOverlay({ shipPlacements, hits, grid }) {
-  const CELL = 36, HDR = 24, SZ = HDR + GRID * CELL
+function ShipOverlay({ shipPlacements, hits, grid, cell, hdr }) {
+  const BASE_CELL = 36, BASE_HDR = 24
+  const BASE_SZ = BASE_HDR + GRID * BASE_CELL
+  const actualSZ = hdr + GRID * cell
   return (
-    <svg width={SZ} height={SZ}
+    <svg width={actualSZ} height={actualSZ}
+      viewBox={`0 0 ${BASE_SZ} ${BASE_SZ}`}
       style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
       {Object.entries(shipPlacements).map(([shipId, { row, col, dir }]) => {
         const ship = SHIPS.find(s => s.id === shipId)
@@ -793,7 +796,7 @@ function ShipOverlay({ shipPlacements, hits, grid }) {
         const sunk = hits && grid ? checkSunk(shipId, grid, hits) : false
         return (
           <ShipShape key={shipId} shipId={shipId} size={ship.size}
-            x={HDR + col * CELL} y={HDR + row * CELL} dir={dir} sunk={sunk}/>
+            x={BASE_HDR + col * BASE_CELL} y={BASE_HDR + row * BASE_CELL} dir={dir} sunk={sunk}/>
         )
       })}
     </svg>
@@ -803,6 +806,24 @@ function ShipOverlay({ shipPlacements, hits, grid }) {
 // ── Grid component ────────────────────────────────────────────────────────────
 function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements }) {
   // mode: 'placement' | 'my-board' | 'enemy-board'
+  const tableRef = useRef(null)
+  const [dims, setDims] = useState({ cell: 36, hdr: 24 })
+
+  useEffect(() => {
+    const measure = () => {
+      if (!tableRef.current) return
+      const cell = tableRef.current.querySelector('.grid-cell')
+      const hdr = tableRef.current.querySelector('.grid-row-header')
+      if (cell && hdr) {
+        setDims({ cell: cell.offsetWidth, hdr: hdr.offsetWidth })
+      }
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (tableRef.current) ro.observe(tableRef.current)
+    return () => ro.disconnect()
+  }, [])
+
   const getCellClass = (r, c) => {
     const classes = ['grid-cell']
     const h = hits?.[r]?.[c]
@@ -840,8 +861,8 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
   const hasShips = shipPlacements && Object.keys(shipPlacements).length > 0
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
-      {hasShips && <ShipOverlay shipPlacements={shipPlacements} hits={hits} grid={grid}/>}
-      <table className="grid-table">
+      {hasShips && <ShipOverlay shipPlacements={shipPlacements} hits={hits} grid={grid} cell={dims.cell} hdr={dims.hdr}/>}
+      <table className="grid-table" ref={tableRef}>
         <thead>
           <tr>
             <th className="grid-row-header" />
