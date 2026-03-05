@@ -585,6 +585,8 @@ const CSS = `
     .battle-stats { order: 3; }
     .boards-row { order: 1; }
     .battle-log { order: 4; }
+    .ship-panel { order: 2; }
+    .grid-wrapper { order: 1; }
     .end-stats { gap: 20px; }
   }
   @media (max-width: 400px) {
