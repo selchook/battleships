@@ -440,7 +440,7 @@ const CSS = `
     top: 50%; left: 50%; transform: translate(-50%,-50%);
     box-shadow: 0 0 6px rgba(0,150,200,0.5);
   }
-  .grid-cell.sunk { background: rgba(20,30,18,0.5) !important; border-color: rgba(80,100,70,0.4) !important; }
+  .grid-cell.sunk { background: transparent !important; border-color: rgba(80,100,70,0.3) !important; }
   .grid-cell.enemy-ship {
     background: rgba(255,50,0,0.2) !important;
     border-color: rgba(255,80,0,0.5) !important;
@@ -959,7 +959,12 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
     const h = hits?.[r]?.[c]
     const s = grid?.[r]?.[c]
     if (h === 'hit') {
-      classes.push('hit')
+      const shipId = grid?.[r]?.[c]
+      if (mode === 'enemy-board' && shipId && checkSunk(shipId, grid, hits)) {
+        classes.push('sunk')
+      } else {
+        classes.push('hit')
+      }
     } else if (h === 'miss') {
       classes.push('miss')
     } else if (s) {
