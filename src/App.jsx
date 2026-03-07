@@ -714,52 +714,12 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   const t = dir === 'H' ? `translate(${x},${y})` : `translate(${x},${y + L}) rotate(-90)`
 
   // Color palette
-  const h  = '#0b2e52'
-  const d  = '#0e3d6e'
-  const s2 = '#144e87'
-  const ac = '#00c8f8'
-  const lt = '#6ddbff'
+  const h  = sunk ? '#2a3028' : '#0b2e52'   // hull
+  const d  = sunk ? '#363d32' : '#0e3d6e'   // deck
+  const s2 = sunk ? '#484f42' : '#144e87'   // superstructure
+  const ac = sunk ? '#7a8a72' : '#00c8f8'   // accent / edge
+  const lt = sunk ? '#9aaa90' : '#6ddbff'   // lights / barrels
   const op = sunk ? 0.5 : 1
-
-  if (sunk) {
-    // Gray wrecked hull fragments
-    const wh = '#3a3a3a'   // dark gray hull
-    const wa = '#666666'   // medium gray accent
-    const wl = '#888888'   // light gray highlight
-    const wreckSegs = {
-      carrier: [
-        `M 3,16 L 14,13 L 28,15 L 40,12 L 50,15 L 48,23 L 40,25 L 28,23 L 14,23 L 3,21 Z`,
-        `M 58,14 L 72,11 L 90,13 L 108,11 L 116,15 L 114,23 L 108,25 L 90,23 L 72,22 L 58,21 Z`,
-        `M 124,15 L 138,12 L 155,14 L 168,13 L 176,17 L 175,22 L 168,24 L 155,23 L 138,22 L 124,21 Z`,
-      ],
-      battleship: [
-        `M 3,16 L 16,13 L 36,15 L 52,12 L 60,16 L 58,24 L 52,25 L 36,23 L 16,23 L 3,21 Z`,
-        `M 68,13 L 82,11 L 106,14 L 122,12 L 140,16 L 142,22 L 122,24 L 106,23 L 82,22 L 68,20 Z`,
-      ],
-      cruiser: [
-        `M 3,16 L 14,13 L 30,15 L 42,12 L 48,17 L 46,24 L 42,25 L 30,23 L 14,23 L 3,21 Z`,
-        `M 55,14 L 66,12 L 82,15 L 94,12 L 104,16 L 102,23 L 94,24 L 82,23 L 66,22 L 55,20 Z`,
-      ],
-      submarine: [
-        `M 8,15 L 20,12 L 40,14 L 56,13 L 70,15 L 86,13 L 100,15 L 105,17 L 106,20 L 100,22 L 86,23 L 70,21 L 56,22 L 40,21 L 20,22 L 8,20 Z`,
-      ],
-      destroyer: [
-        `M 2,16 L 12,13 L 26,15 L 32,12 L 36,17 L 34,24 L 26,25 L 12,23 L 2,21 Z`,
-        `M 40,14 L 52,12 L 64,15 L 70,13 L 71,18 L 70,23 L 64,24 L 52,22 L 40,20 Z`,
-      ],
-    }
-    const segs = wreckSegs[shipId] || [`M 2,16 L ${L-2},14 L ${L-1},19 L ${L-2},22 L 2,21 Z`]
-    return (
-      <g transform={t} opacity={op}>
-        {segs.map((path, i) => (
-          <path key={i} d={path} fill={wh} stroke={wa} strokeWidth={1.2} strokeLinejoin="round"/>
-        ))}
-        {segs.map((path, i) => (
-          <path key={`s${i}`} d={path} fill="none" stroke={wl} strokeWidth={0.3} opacity={0.25}/>
-        ))}
-      </g>
-    )
-  }
 
   // Hull profiles per ship type
   const hullPath = {
