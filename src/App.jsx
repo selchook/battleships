@@ -440,8 +440,7 @@ const CSS = `
     top: 50%; left: 50%; transform: translate(-50%,-50%);
     box-shadow: 0 0 6px rgba(0,150,200,0.5);
   }
-  .grid-cell.sunk { background: rgba(40,0,0,0.7) !important; border-color: rgba(120,0,0,0.5) !important; }
-  .grid-cell.sunk::after { content: '🔥'; font-size: 14px; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .grid-cell.sunk { background: rgba(20,30,18,0.5) !important; border-color: rgba(80,100,70,0.4) !important; }
   .grid-cell.enemy-ship {
     background: rgba(255,50,0,0.2) !important;
     border-color: rgba(255,80,0,0.5) !important;
