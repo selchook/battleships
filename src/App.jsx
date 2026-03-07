@@ -722,43 +722,6 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   const lt = sunk ? '#9aaa90' : '#6ddbff'   // lights / barrels
   const op = sunk ? 0.5 : 1
 
-  if (sunk) {
-    // Wrecked hull fragments — low-profile broken pieces per ship type
-    const wreckSegs = {
-      carrier: [
-        `M 3,16 L 14,13 L 28,15 L 40,12 L 50,15 L 48,23 L 40,25 L 28,23 L 14,23 L 3,21 Z`,
-        `M 58,14 L 72,11 L 90,13 L 108,11 L 116,15 L 114,23 L 108,25 L 90,23 L 72,22 L 58,21 Z`,
-        `M 124,15 L 138,12 L 155,14 L 168,13 L 176,17 L 175,22 L 168,24 L 155,23 L 138,22 L 124,21 Z`,
-      ],
-      battleship: [
-        `M 3,16 L 16,13 L 36,15 L 52,12 L 60,16 L 58,24 L 52,25 L 36,23 L 16,23 L 3,21 Z`,
-        `M 68,13 L 82,11 L 106,14 L 122,12 L 140,16 L 142,22 L 122,24 L 106,23 L 82,22 L 68,20 Z`,
-      ],
-      cruiser: [
-        `M 3,16 L 14,13 L 30,15 L 42,12 L 48,17 L 46,24 L 42,25 L 30,23 L 14,23 L 3,21 Z`,
-        `M 55,14 L 66,12 L 82,15 L 94,12 L 104,16 L 102,23 L 94,24 L 82,23 L 66,22 L 55,20 Z`,
-      ],
-      submarine: [
-        `M 8,15 L 20,12 L 40,14 L 56,13 L 70,15 L 56,13 L 70,15 L 86,13 L 100,15 L 105,17 L 106,20 L 100,22 L 86,23 L 70,21 L 56,22 L 40,21 L 20,22 L 8,20 Z`,
-      ],
-      destroyer: [
-        `M 2,16 L 12,13 L 26,15 L 32,12 L 36,17 L 34,24 L 26,25 L 12,23 L 2,21 Z`,
-        `M 40,14 L 52,12 L 64,15 L 70,13 L 71,18 L 70,23 L 64,24 L 52,22 L 40,20 Z`,
-      ],
-    }
-    const segs = wreckSegs[shipId] || [`M 2,16 L ${L-2},14 L ${L-1},19 L ${L-2},22 L 2,21 Z`]
-    return (
-      <g transform={t} opacity={op}>
-        {segs.map((path, i) => (
-          <path key={i} d={path} fill={h} stroke={ac} strokeWidth={1.2} strokeLinejoin="round"/>
-        ))}
-        {segs.map((path, i) => (
-          <path key={`s${i}`} d={path} fill="none" stroke={lt} strokeWidth={0.3} opacity={0.2}/>
-        ))}
-      </g>
-    )
-  }
-
   // Hull profiles per ship type
   const hullPath = {
     carrier:    `M 4,9 L ${L-12},7 L ${L-3},11 L ${L-1},18 L ${L-3},25 L ${L-12},29 L 4,27 L 2,18 Z`,
