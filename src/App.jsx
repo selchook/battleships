@@ -869,20 +869,17 @@ function ShipOverlay({ shipPlacements, hits, grid, cell, hdr }) {
 function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements, onCellTap, onCellLongPress }) {
   // mode: 'placement' | 'my-board' | 'enemy-board'
   const tableRef = useRef(null)
+  // Always-current callback ref — solves stale closure issues across re-renders
+  const cb = useRef({})
+  cb.current = { onCellClick, onCellHover, onCellTap, onCellLongPress, grid, mode }
   const [dims, setDims] = useState({ cell: 36, hdr: 24 })
-  const longPressTimer = useRef(null)
-  const longPressActive = useRef(false)
-  const downCell = useRef(null)
-  const pointerStart = useRef(null)
 
   useEffect(() => {
     const measure = () => {
       if (!tableRef.current) return
-      const cell = tableRef.current.querySelector('.grid-cell')
-      const hdr = tableRef.current.querySelector('.grid-row-header')
-      if (cell && hdr) {
-        setDims({ cell: cell.offsetWidth, hdr: hdr.offsetWidth })
-      }
+      const cellEl = tableRef.current.querySelector('.grid-cell')
+      const hdrEl = tableRef.current.querySelector('.grid-row-header')
+      if (cellEl && hdrEl) setDims({ cell: cellEl.offsetWidth, hdr: hdrEl.offsetWidth })
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -890,72 +887,73 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
     return () => ro.disconnect()
   }, [])
 
-  const coordsToCell = useCallback((clientX, clientY) => {
+  // Reads live DOM each call — always accurate regardless of CSS breakpoints
+  const coordsToCell = (clientX, clientY) => {
     if (!tableRef.current) return null
     const rect = tableRef.current.getBoundingClientRect()
-    const x = clientX - rect.left - dims.hdr
-    const y = clientY - rect.top - dims.hdr
-    const c = Math.floor(x / dims.cell)
-    const r = Math.floor(y / dims.cell)
-    if (r >= 0 && r < GRID && c >= 0 && c < GRID) return [r, c]
+    const cellEl = tableRef.current.querySelector('.grid-cell')
+    const hdrEl = tableRef.current.querySelector('.grid-row-header')
+    if (!cellEl || !hdrEl) return null
+    const cellW = cellEl.offsetWidth
+    const hdrW = hdrEl.offsetWidth
+    const x = clientX - rect.left - hdrW
+    const y = clientY - rect.top - hdrW
+    const col = Math.floor(x / cellW)
+    const row = Math.floor(y / cellW)
+    if (row >= 0 && row < GRID && col >= 0 && col < GRID) return [row, col]
     return null
-  }, [dims])
-
-  // All pointer handling lives on the container so setPointerCapture works reliably
-  const handlePointerDown = (e) => {
-    if (mode !== 'placement') return
-    const cell = coordsToCell(e.clientX, e.clientY)
-    if (!cell) return
-    const [r, c] = cell
-    if (!grid?.[r]?.[c]) return          // only ship cells trigger long-press
-    e.preventDefault()
-    // Capture all future pointer events to this container (works for mouse + touch)
-    e.currentTarget.setPointerCapture(e.pointerId)
-    longPressActive.current = false
-    downCell.current = [r, c]
-    pointerStart.current = { x: e.clientX, y: e.clientY }
-    longPressTimer.current = setTimeout(() => {
-      longPressActive.current = true
-      onCellLongPress?.(r, c)
-    }, 450)
   }
 
-  const handlePointerMove = (e) => {
-    if (mode !== 'placement') return
-    if (longPressActive.current) {
-      e.preventDefault()
-      const cell = coordsToCell(e.clientX, e.clientY)
-      if (cell) onCellHover?.(cell[0], cell[1])
-      return
-    }
-    // Cancel long-press if the finger/cursor moves too much before timer fires
-    if (longPressTimer.current && pointerStart.current) {
-      const dx = Math.abs(e.clientX - pointerStart.current.x)
-      const dy = Math.abs(e.clientY - pointerStart.current.y)
-      if (dx > 8 || dy > 8) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-        downCell.current = null
+  const handlePointerDown = (e) => {
+    if (cb.current.mode !== 'placement') return
+    const cell = coordsToCell(e.clientX, e.clientY)
+    if (!cell || !cb.current.grid?.[cell[0]]?.[cell[1]]) return
+    e.preventDefault()
+
+    const [r, c] = cell
+    let active = false            // true after long-press fires
+    const sx = e.clientX, sy = e.clientY
+
+    const onMove = (me) => {
+      if (active) {
+        me.preventDefault()
+        const h = coordsToCell(me.clientX, me.clientY)
+        if (h) cb.current.onCellHover?.(h[0], h[1])
+      } else if (Math.abs(me.clientX - sx) > 10 || Math.abs(me.clientY - sy) > 10) {
+        // Moved too much before long-press — cancel (treat as scroll)
+        clearTimeout(timer)
+        cleanup()
       }
     }
-  }
 
-  const handlePointerUp = (e) => {
-    if (mode !== 'placement') return
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
+    const onUp = (ue) => {
+      clearTimeout(timer)
+      if (active) {
+        const d = coordsToCell(ue.clientX, ue.clientY)
+        if (d) cb.current.onCellClick?.(d[0], d[1])
+        cb.current.onCellHover?.(null, null)
+      } else {
+        cb.current.onCellTap?.(r, c)
+      }
+      cleanup()
     }
-    if (longPressActive.current) {
-      const cell = coordsToCell(e.clientX, e.clientY)
-      if (cell) onCellClick?.(cell[0], cell[1])
-      longPressActive.current = false
-      onCellHover?.(null, null)
-    } else if (downCell.current) {
-      onCellTap?.(downCell.current[0], downCell.current[1])
+
+    const cleanup = () => {
+      active = false
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
     }
-    downCell.current = null
-    pointerStart.current = null
+
+    // Native document listeners fire reliably across re-renders and anywhere on screen
+    document.addEventListener('pointermove', onMove, { passive: false })
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
+
+    const timer = setTimeout(() => {
+      active = true
+      cb.current.onCellLongPress?.(r, c)
+    }, 450)
   }
 
   const getCellClass = (r, c) => {
@@ -995,9 +993,6 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
     <div
       style={{ position: 'relative', display: 'inline-block', touchAction: mode === 'placement' ? 'none' : 'auto' }}
       onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
     >
       {hasShips && <ShipOverlay shipPlacements={shipPlacements} hits={hits} grid={grid} cell={dims.cell} hdr={dims.hdr}/>}
       <table className="grid-table" ref={tableRef}>
@@ -1019,8 +1014,8 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
                     if (mode === 'placement' && grid?.[r]?.[c]) return
                     onCellClick?.(r, c)
                   }}
-                  onMouseEnter={() => { if (!longPressActive.current) onCellHover?.(r, c) }}
-                  onMouseLeave={() => { if (!longPressActive.current) onCellHover?.(null, null) }}
+                  onMouseEnter={() => onCellHover?.(r, c)}
+                  onMouseLeave={() => onCellHover?.(null, null)}
                   onDragOver={(e) => { e.preventDefault(); onCellHover?.(r, c) }}
                   onDragLeave={() => onCellHover?.(null, null)}
                   onDrop={(e) => { e.preventDefault(); onCellClick?.(r, c) }}
