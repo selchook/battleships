@@ -911,49 +911,42 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
     e.preventDefault()
 
     const [r, c] = cell
-    let active = false            // true after long-press fires
+    let dragging = false      // true once pointer moves enough to count as drag
     const sx = e.clientX, sy = e.clientY
 
     const onMove = (me) => {
-      if (active) {
-        me.preventDefault()
-        const h = coordsToCell(me.clientX, me.clientY)
-        if (h) cb.current.onCellHover?.(h[0], h[1])
-      } else if (Math.abs(me.clientX - sx) > 10 || Math.abs(me.clientY - sy) > 10) {
-        // Moved too much before long-press — cancel (treat as scroll)
-        clearTimeout(timer)
-        cleanup()
+      if (!dragging) {
+        if (Math.abs(me.clientX - sx) > 5 || Math.abs(me.clientY - sy) > 5) {
+          dragging = true
+          cb.current.onCellLongPress?.(r, c)  // pick up ship on first real movement
+        } else return
       }
+      me.preventDefault()
+      const h = coordsToCell(me.clientX, me.clientY)
+      if (h) cb.current.onCellHover?.(h[0], h[1])
     }
 
     const onUp = (ue) => {
-      clearTimeout(timer)
-      if (active) {
+      if (dragging) {
         const d = coordsToCell(ue.clientX, ue.clientY)
-        if (d) cb.current.onCellClick?.(d[0], d[1])
+        // Drop at pointer, or back at origin if released outside grid
+        cb.current.onCellClick?.(d ? d[0] : r, d ? d[1] : c)
         cb.current.onCellHover?.(null, null)
       } else {
-        cb.current.onCellTap?.(r, c)
+        cb.current.onCellTap?.(r, c)  // no movement = tap = rotate
       }
       cleanup()
     }
 
     const cleanup = () => {
-      active = false
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onUp)
       document.removeEventListener('pointercancel', onUp)
     }
 
-    // Native document listeners fire reliably across re-renders and anywhere on screen
     document.addEventListener('pointermove', onMove, { passive: false })
     document.addEventListener('pointerup', onUp)
     document.addEventListener('pointercancel', onUp)
-
-    const timer = setTimeout(() => {
-      active = true
-      cb.current.onCellLongPress?.(r, c)
-    }, 450)
   }
 
   const getCellClass = (r, c) => {
@@ -1305,9 +1298,18 @@ export default function App() {
     if (!ship) return
     const newDir = placement.dir === 'H' ? 'V' : 'H'
     const gridWithout = myGrid.map(r => r.map(c => c === shipId ? null : c))
-    if (canPlace(gridWithout, ship, placement.row, placement.col, newDir)) {
-      setMyGrid(placeShip(gridWithout, ship, placement.row, placement.col, newDir))
-      AudioEngine.init(); AudioEngine.play('place')
+    // Try same anchor first, then shift inward:
+    //   H→V: shift anchor UP so ship doesn't go past bottom border
+    //   V→H: shift anchor LEFT so ship doesn't go past right border
+    for (let offset = 0; offset < ship.size; offset++) {
+      const row = newDir === 'V' ? placement.row - offset : placement.row
+      const col = newDir === 'H' ? placement.col - offset : placement.col
+      if (row < 0 || col < 0) break
+      if (canPlace(gridWithout, ship, row, col, newDir)) {
+        setMyGrid(placeShip(gridWithout, ship, row, col, newDir))
+        AudioEngine.init(); AudioEngine.play('place')
+        return
+      }
     }
   }
 
