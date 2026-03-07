@@ -404,7 +404,8 @@ const CSS = `
     background: rgba(4,18,38,0.6);
   }
   .grid-cell:hover { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.3); }
-  .grid-cell.ship { background: transparent; border-color: rgba(0,212,255,0.1); }
+  .grid-cell.ship { background: transparent; border-color: rgba(0,212,255,0.1); cursor: grab; }
+  .grid-cell.ship:active { cursor: grabbing; }
   .grid-cell.preview-ok { background: rgba(0,212,255,0.15) !important; border-color: rgba(0,212,255,0.5) !important; }
   .grid-cell.preview-bad { background: rgba(255,56,56,0.15) !important; border-color: rgba(255,56,56,0.4) !important; }
   .grid-cell.hit {
@@ -865,10 +866,15 @@ function ShipOverlay({ shipPlacements, hits, grid, cell, hdr }) {
 }
 
 // ── Grid component ────────────────────────────────────────────────────────────
-function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements }) {
+function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements, onCellTap, onCellLongPress }) {
   // mode: 'placement' | 'my-board' | 'enemy-board'
   const tableRef = useRef(null)
   const [dims, setDims] = useState({ cell: 36, hdr: 24 })
+  const [isDragging, setIsDragging] = useState(false)
+  const longPressTimer = useRef(null)
+  const longPressActive = useRef(false)
+  const downCell = useRef(null)
+  const pointerStart = useRef(null)
 
   useEffect(() => {
     const measure = () => {
@@ -885,13 +891,72 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
     return () => ro.disconnect()
   }, [])
 
+  const coordsToCell = useCallback((clientX, clientY) => {
+    if (!tableRef.current) return null
+    const rect = tableRef.current.getBoundingClientRect()
+    const x = clientX - rect.left - dims.hdr
+    const y = clientY - rect.top - dims.hdr
+    const c = Math.floor(x / dims.cell)
+    const r = Math.floor(y / dims.cell)
+    if (r >= 0 && r < GRID && c >= 0 && c < GRID) return [r, c]
+    return null
+  }, [dims])
+
+  const handlePointerDown = (e, r, c) => {
+    if (mode !== 'placement' || !grid?.[r]?.[c]) return
+    e.preventDefault()
+    longPressActive.current = false
+    downCell.current = [r, c]
+    pointerStart.current = { x: e.clientX, y: e.clientY }
+    longPressTimer.current = setTimeout(() => {
+      longPressActive.current = true
+      setIsDragging(true)
+      onCellLongPress?.(r, c)
+    }, 450)
+  }
+
+  const handlePointerMove = (e) => {
+    if (mode !== 'placement') return
+    if (longPressActive.current) {
+      const cell = coordsToCell(e.clientX, e.clientY)
+      if (cell) onCellHover?.(cell[0], cell[1])
+      return
+    }
+    if (longPressTimer.current && pointerStart.current) {
+      const dx = Math.abs(e.clientX - pointerStart.current.x)
+      const dy = Math.abs(e.clientY - pointerStart.current.y)
+      if (dx > 8 || dy > 8) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+        downCell.current = null
+      }
+    }
+  }
+
+  const handlePointerUp = (e) => {
+    if (mode !== 'placement') return
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    if (longPressActive.current) {
+      const cell = coordsToCell(e.clientX, e.clientY)
+      if (cell) onCellClick?.(cell[0], cell[1])
+      longPressActive.current = false
+      setIsDragging(false)
+      onCellHover?.(null, null)
+    } else if (downCell.current) {
+      onCellTap?.(downCell.current[0], downCell.current[1])
+    }
+    downCell.current = null
+    pointerStart.current = null
+  }
+
   const getCellClass = (r, c) => {
     const classes = ['grid-cell']
     const h = hits?.[r]?.[c]
     const s = grid?.[r]?.[c]
     if (h === 'hit') {
-      // Check if sunk
-      const shipId = ships?.[r]?.[c] || grid?.[r]?.[c]
       classes.push('hit')
     } else if (h === 'miss') {
       classes.push('miss')
@@ -921,7 +986,12 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
 
   const hasShips = shipPlacements && Object.keys(shipPlacements).length > 0
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div
+      style={{ position: 'relative', display: 'inline-block', touchAction: isDragging ? 'none' : 'auto' }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       {hasShips && <ShipOverlay shipPlacements={shipPlacements} hits={hits} grid={grid} cell={dims.cell} hdr={dims.hdr}/>}
       <table className="grid-table" ref={tableRef}>
         <thead>
@@ -938,12 +1008,16 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
                 <td
                   key={c}
                   className={getCellClass(r, c)}
-                  onClick={() => onCellClick?.(r, c)}
-                  onMouseEnter={() => onCellHover?.(r, c)}
-                  onMouseLeave={() => onCellHover?.(null, null)}
+                  onClick={() => {
+                    if (mode === 'placement' && grid?.[r]?.[c]) return
+                    onCellClick?.(r, c)
+                  }}
+                  onMouseEnter={() => { if (!longPressActive.current) onCellHover?.(r, c) }}
+                  onMouseLeave={() => { if (!longPressActive.current) onCellHover?.(null, null) }}
                   onDragOver={(e) => { e.preventDefault(); onCellHover?.(r, c) }}
                   onDragLeave={() => onCellHover?.(null, null)}
                   onDrop={(e) => { e.preventDefault(); onCellClick?.(r, c) }}
+                  onPointerDown={(e) => handlePointerDown(e, r, c)}
                 />
               ))}
             </tr>
@@ -1223,10 +1297,29 @@ export default function App() {
     AudioEngine.init(); AudioEngine.play('place')
   }
 
-  const handleReset = () => {
-    setMyGrid(makeEmptyGrid())
-    setPlacedShips([])
-    setSelectedShipIdx(0)
+  const rotateShipOnGrid = (shipId) => {
+    const placement = inferAllPlacements(myGrid)[shipId]
+    if (!placement) return
+    const ship = SHIPS.find(s => s.id === shipId)
+    if (!ship) return
+    const newDir = placement.dir === 'H' ? 'V' : 'H'
+    const gridWithout = myGrid.map(r => r.map(c => c === shipId ? null : c))
+    if (canPlace(gridWithout, ship, placement.row, placement.col, newDir)) {
+      setMyGrid(placeShip(gridWithout, ship, placement.row, placement.col, newDir))
+      AudioEngine.init(); AudioEngine.play('place')
+    }
+  }
+
+  const startDraggingShip = (shipId) => {
+    const placement = inferAllPlacements(myGrid)[shipId]
+    if (!placement) return
+    const newPlacedShips = placedShips.filter(id => id !== shipId)
+    const newUnplaced = SHIPS.filter(s => !newPlacedShips.includes(s.id))
+    const idx = newUnplaced.findIndex(s => s.id === shipId)
+    setMyGrid(myGrid.map(r => r.map(c => c === shipId ? null : c)))
+    setPlacedShips(newPlacedShips)
+    setSelectedShipIdx(Math.max(0, idx))
+    setDirection(placement.dir)
   }
 
   // Start battle when both ready
@@ -1317,6 +1410,11 @@ export default function App() {
       setScreen('placement')
     }
   }, [connected])
+
+  // Auto-place ships when entering placement screen
+  useEffect(() => {
+    if (screen === 'placement') handleRandomPlace()
+  }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-join from URL param (?join=CODE)
   useEffect(() => {
@@ -1470,39 +1568,40 @@ export default function App() {
             {/* Ship List */}
             <div className="ship-panel">
               <h4>Fleet</h4>
-              {SHIPS.map((s, i) => {
+              {SHIPS.map((s) => {
                 const placed = placedShips.includes(s.id)
                 const active = !placed && unplacedShips[selectedShipIdx]?.id === s.id
                 return (
                   <div
                     key={s.id}
-                    className={`ship-item ${placed ? 'placed' : ''} ${active ? 'active' : ''}`}
-                    draggable={!placed}
+                    className={`ship-item ${active ? 'active' : ''}`}
+                    style={{ cursor: 'grab' }}
+                    draggable
                     onClick={() => {
-                      if (!placed) {
+                      if (placed) {
+                        startDraggingShip(s.id)
+                      } else {
                         const idx = unplacedShips.findIndex(u => u.id === s.id)
                         if (idx >= 0) {
-                          if (active) {
-                            setDirection(d => d === 'H' ? 'V' : 'H')
-                          } else {
-                            setSelectedShipIdx(idx)
-                          }
+                          if (active) setDirection(d => d === 'H' ? 'V' : 'H')
+                          else setSelectedShipIdx(idx)
                         }
                       }
                     }}
                     onDragStart={(e) => {
-                      if (!placed) {
+                      if (placed) startDraggingShip(s.id)
+                      else {
                         const idx = unplacedShips.findIndex(u => u.id === s.id)
                         if (idx >= 0) setSelectedShipIdx(idx)
-                        e.dataTransfer.setData('text/plain', s.id)
                       }
+                      e.dataTransfer.setData('text/plain', s.id)
                     }}
                   >
                     <span>{s.icon}</span>
                     <span className="ship-name">{s.name}</span>
                     <div className="ship-size-dots">
                       {Array.from({ length: s.size }, (_, i) => (
-                        <div key={i} className={`ship-dot filled`} />
+                        <div key={i} className="ship-dot filled" />
                       ))}
                     </div>
                   </div>
@@ -1511,10 +1610,9 @@ export default function App() {
 
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div className="text-small" style={{ textAlign: 'center', color: 'var(--dim)', fontSize: 10, letterSpacing: 1 }}>
-                  Tap active ship to rotate · Drag to grid
+                  Hold to drag · Tap to rotate
                 </div>
-                <button className="btn btn-primary btn-sm btn-full" onClick={handleRandomPlace}>🎲 Random Place</button>
-                <button className="btn btn-danger btn-sm btn-full" onClick={handleReset}>↺ Reset</button>
+                <button className="btn btn-primary btn-sm btn-full" onClick={handleRandomPlace}>🎲 Randomize</button>
                 <button className="btn btn-sm btn-full" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--dim)', border: '1px solid rgba(255,255,255,0.15)' }} onClick={startNewGame}>← Lobby</button>
                 {myReady ? (
                   <div className="waiting-msg" style={{ textAlign: 'center', padding: '8px 0' }}>
@@ -1545,13 +1643,15 @@ export default function App() {
                   hoverDirection={direction}
                   onCellClick={handlePlacementClick}
                   onCellHover={(r, c) => r !== null ? setHoveredCell([r, c]) : setHoveredCell(null)}
+                  onCellTap={(r, c) => { const id = myGrid[r][c]; if (id) rotateShipOnGrid(id) }}
+                  onCellLongPress={(r, c) => { const id = myGrid[r][c]; if (id) startDraggingShip(id) }}
                   shipPlacements={myShipPlacements}
                 />
               </div>
               <div className="text-small" style={{ textAlign: 'center' }}>
                 {selectedShip
-                  ? `Placing: ${selectedShip.icon} ${selectedShip.name} (${selectedShip.size} cells)`
-                  : placedShips.length === SHIPS.length ? '✅ All ships placed!' : ''}
+                  ? `Placing: ${selectedShip.icon} ${selectedShip.name}`
+                  : '✅ All ships placed!'}
               </div>
             </div>
           </div>
