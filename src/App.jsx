@@ -715,11 +715,11 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   const t = dir === 'H' ? `translate(${x},${y})` : `translate(${x},${y + L}) rotate(-90)`
 
   // Color palette
-  const h  = sunk ? '#180303' : '#0b2e52'   // hull
-  const d  = sunk ? '#2e0606' : '#0e3d6e'   // deck
-  const s2 = sunk ? '#4a0a0a' : '#144e87'   // superstructure
-  const ac = sunk ? '#bb1515' : '#00c8f8'   // accent / edge
-  const lt = sunk ? '#e84040' : '#6ddbff'   // lights / barrels
+  const h  = sunk ? '#2a3028' : '#0b2e52'   // hull
+  const d  = sunk ? '#363d32' : '#0e3d6e'   // deck
+  const s2 = sunk ? '#484f42' : '#144e87'   // superstructure
+  const ac = sunk ? '#7a8a72' : '#00c8f8'   // accent / edge
+  const lt = sunk ? '#9aaa90' : '#6ddbff'   // lights / barrels
   const op = sunk ? 0.5 : 1
 
   if (sunk) {
