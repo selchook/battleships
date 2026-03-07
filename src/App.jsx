@@ -960,7 +960,7 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
     const s = grid?.[r]?.[c]
     if (h === 'hit') {
       const shipId = grid?.[r]?.[c]
-      if (mode === 'enemy-board' && shipId && checkSunk(shipId, grid, hits)) {
+      if (shipId && checkSunk(shipId, grid, hits)) {
         classes.push('sunk')
       } else {
         classes.push('hit')
