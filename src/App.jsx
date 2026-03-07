@@ -870,7 +870,6 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
   // mode: 'placement' | 'my-board' | 'enemy-board'
   const tableRef = useRef(null)
   const [dims, setDims] = useState({ cell: 36, hdr: 24 })
-  const [isDragging, setIsDragging] = useState(false)
   const longPressTimer = useRef(null)
   const longPressActive = useRef(false)
   const downCell = useRef(null)
@@ -902,15 +901,21 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
     return null
   }, [dims])
 
-  const handlePointerDown = (e, r, c) => {
-    if (mode !== 'placement' || !grid?.[r]?.[c]) return
+  // All pointer handling lives on the container so setPointerCapture works reliably
+  const handlePointerDown = (e) => {
+    if (mode !== 'placement') return
+    const cell = coordsToCell(e.clientX, e.clientY)
+    if (!cell) return
+    const [r, c] = cell
+    if (!grid?.[r]?.[c]) return          // only ship cells trigger long-press
     e.preventDefault()
+    // Capture all future pointer events to this container (works for mouse + touch)
+    e.currentTarget.setPointerCapture(e.pointerId)
     longPressActive.current = false
     downCell.current = [r, c]
     pointerStart.current = { x: e.clientX, y: e.clientY }
     longPressTimer.current = setTimeout(() => {
       longPressActive.current = true
-      setIsDragging(true)
       onCellLongPress?.(r, c)
     }, 450)
   }
@@ -918,10 +923,12 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
   const handlePointerMove = (e) => {
     if (mode !== 'placement') return
     if (longPressActive.current) {
+      e.preventDefault()
       const cell = coordsToCell(e.clientX, e.clientY)
       if (cell) onCellHover?.(cell[0], cell[1])
       return
     }
+    // Cancel long-press if the finger/cursor moves too much before timer fires
     if (longPressTimer.current && pointerStart.current) {
       const dx = Math.abs(e.clientX - pointerStart.current.x)
       const dy = Math.abs(e.clientY - pointerStart.current.y)
@@ -943,7 +950,6 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
       const cell = coordsToCell(e.clientX, e.clientY)
       if (cell) onCellClick?.(cell[0], cell[1])
       longPressActive.current = false
-      setIsDragging(false)
       onCellHover?.(null, null)
     } else if (downCell.current) {
       onCellTap?.(downCell.current[0], downCell.current[1])
@@ -987,7 +993,8 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
   const hasShips = shipPlacements && Object.keys(shipPlacements).length > 0
   return (
     <div
-      style={{ position: 'relative', display: 'inline-block', touchAction: isDragging ? 'none' : 'auto' }}
+      style={{ position: 'relative', display: 'inline-block', touchAction: mode === 'placement' ? 'none' : 'auto' }}
+      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
@@ -1017,7 +1024,6 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
                   onDragOver={(e) => { e.preventDefault(); onCellHover?.(r, c) }}
                   onDragLeave={() => onCellHover?.(null, null)}
                   onDrop={(e) => { e.preventDefault(); onCellClick?.(r, c) }}
-                  onPointerDown={(e) => handlePointerDown(e, r, c)}
                 />
               ))}
             </tr>
