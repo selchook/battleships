@@ -117,6 +117,17 @@ const AudioEngine = {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+function findNearestValidPlacement(grid, ship, row, col, dir) {
+  const candidates = []
+  for (let r = 0; r < GRID; r++)
+    for (let c = 0; c < GRID; c++)
+      candidates.push([r, c, (r - row) ** 2 + (c - col) ** 2])
+  candidates.sort((a, b) => a[2] - b[2])
+  for (const [r, c] of candidates)
+    if (canPlace(grid, ship, r, c, dir)) return [r, c]
+  return null
+}
+
 function makeEmptyGrid() {
   return Array.from({ length: GRID }, () => Array(GRID).fill(null))
 }
@@ -709,7 +720,7 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   const s2 = sunk ? '#4a0a0a' : '#144e87'   // superstructure
   const ac = sunk ? '#bb1515' : '#00c8f8'   // accent / edge
   const lt = sunk ? '#e84040' : '#6ddbff'   // lights / barrels
-  const op = sunk ? 0.55 : 1
+  const op = sunk ? 0.5 : 1
 
   // Hull profiles per ship type
   const hullPath = {
@@ -826,20 +837,15 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   }
 
   return (
-    <g transform={t}>
-      <g opacity={op}>
-        {/* Hull base */}
-        <path d={hullPath} fill={h} stroke={ac} strokeWidth={1.4} strokeLinejoin="round"/>
-        {/* Deck plate */}
-        {deckPath && <path d={deckPath} fill={d} opacity={0.9}/>}
-        {/* Details */}
-        <Details/>
-        {/* Waterline highlight */}
-        <path d={hullPath} fill="none" stroke={lt} strokeWidth={0.4} opacity={0.25}/>
-      </g>
-      {sunk && Array.from({ length: size }, (_, i) => (
-        <text key={i} x={i * 36 + 18} y={24} textAnchor="middle" fontSize={15} style={{ userSelect: 'none', pointerEvents: 'none' }}>🔥</text>
-      ))}
+    <g transform={t} opacity={op}>
+      {/* Hull base */}
+      <path d={hullPath} fill={h} stroke={ac} strokeWidth={1.4} strokeLinejoin="round"/>
+      {/* Deck plate */}
+      {deckPath && <path d={deckPath} fill={d} opacity={0.9}/>}
+      {/* Details */}
+      <Details/>
+      {/* Waterline highlight */}
+      <path d={hullPath} fill="none" stroke={lt} strokeWidth={0.4} opacity={0.25}/>
     </g>
   )
 }
@@ -1255,9 +1261,13 @@ export default function App() {
 
   const handlePlacementClick = (r, c) => {
     if (!selectedShip) return
-    if (!canPlace(myGrid, selectedShip, r, c, direction)) return
-    const newGrid = placeShip(myGrid, selectedShip, r, c, direction)
-    setMyGrid(newGrid)
+    let row = r, col = c
+    if (!canPlace(myGrid, selectedShip, row, col, direction)) {
+      const nearest = findNearestValidPlacement(myGrid, selectedShip, row, col, direction)
+      if (!nearest) return
+      ;[row, col] = nearest
+    }
+    setMyGrid(placeShip(myGrid, selectedShip, row, col, direction))
     setPlacedShips(prev => [...prev, selectedShip.id])
     setSelectedShipIdx(prev => Math.min(prev, unplacedShips.length - 2))
     AudioEngine.init(); AudioEngine.play('place')
