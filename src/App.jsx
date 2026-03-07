@@ -384,14 +384,6 @@ const CSS = `
   .ship-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--steel); }
   .ship-dot.filled { background: var(--cyan); }
 
-  .orient-btn {
-    font-family: var(--mono); font-size: 11px; color: var(--dim);
-    background: rgba(0,0,0,0.3); border: 1px solid rgba(0,212,255,0.15);
-    padding: 6px 12px; border-radius: 6px; cursor: pointer;
-    transition: all 0.2s; margin-top: 12px; width: 100%; text-align: center;
-  }
-  .orient-btn:hover { border-color: var(--cyan); color: var(--cyan); }
-
   /* GRID */
   .grid-wrapper { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .grid-label { font-size: 11px; letter-spacing: 3px; color: var(--dim); text-transform: uppercase; font-family: var(--mono); }
@@ -716,7 +708,7 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   const s2 = sunk ? '#4a0a0a' : '#144e87'   // superstructure
   const ac = sunk ? '#bb1515' : '#00c8f8'   // accent / edge
   const lt = sunk ? '#e84040' : '#6ddbff'   // lights / barrels
-  const op = sunk ? 0.6 : 1
+  const op = sunk ? 0.55 : 1
 
   // Hull profiles per ship type
   const hullPath = {
@@ -833,15 +825,20 @@ function ShipShape({ shipId, size, x, y, dir, sunk }) {
   }
 
   return (
-    <g transform={t} opacity={op}>
-      {/* Hull base */}
-      <path d={hullPath} fill={h} stroke={ac} strokeWidth={1.4} strokeLinejoin="round"/>
-      {/* Deck plate */}
-      {deckPath && <path d={deckPath} fill={d} opacity={0.9}/>}
-      {/* Details */}
-      <Details/>
-      {/* Waterline highlight */}
-      <path d={hullPath} fill="none" stroke={lt} strokeWidth={0.4} opacity={0.25}/>
+    <g transform={t}>
+      <g opacity={op}>
+        {/* Hull base */}
+        <path d={hullPath} fill={h} stroke={ac} strokeWidth={1.4} strokeLinejoin="round"/>
+        {/* Deck plate */}
+        {deckPath && <path d={deckPath} fill={d} opacity={0.9}/>}
+        {/* Details */}
+        <Details/>
+        {/* Waterline highlight */}
+        <path d={hullPath} fill="none" stroke={lt} strokeWidth={0.4} opacity={0.25}/>
+      </g>
+      {sunk && Array.from({ length: size }, (_, i) => (
+        <text key={i} x={i * 36 + 18} y={24} textAnchor="middle" fontSize={15} style={{ userSelect: 'none', pointerEvents: 'none' }}>🔥</text>
+      ))}
     </g>
   )
 }
@@ -944,6 +941,9 @@ function BattleGrid({ grid, hits, ships, mode, onCellClick, onCellHover, hovered
                   onClick={() => onCellClick?.(r, c)}
                   onMouseEnter={() => onCellHover?.(r, c)}
                   onMouseLeave={() => onCellHover?.(null, null)}
+                  onDragOver={(e) => { e.preventDefault(); onCellHover?.(r, c) }}
+                  onDragLeave={() => onCellHover?.(null, null)}
+                  onDrop={(e) => { e.preventDefault(); onCellClick?.(r, c) }}
                 />
               ))}
             </tr>
@@ -1477,10 +1477,24 @@ export default function App() {
                   <div
                     key={s.id}
                     className={`ship-item ${placed ? 'placed' : ''} ${active ? 'active' : ''}`}
+                    draggable={!placed}
                     onClick={() => {
                       if (!placed) {
                         const idx = unplacedShips.findIndex(u => u.id === s.id)
+                        if (idx >= 0) {
+                          if (active) {
+                            setDirection(d => d === 'H' ? 'V' : 'H')
+                          } else {
+                            setSelectedShipIdx(idx)
+                          }
+                        }
+                      }
+                    }}
+                    onDragStart={(e) => {
+                      if (!placed) {
+                        const idx = unplacedShips.findIndex(u => u.id === s.id)
                         if (idx >= 0) setSelectedShipIdx(idx)
+                        e.dataTransfer.setData('text/plain', s.id)
                       }
                     }}
                   >
@@ -1496,9 +1510,9 @@ export default function App() {
               })}
 
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <button className="orient-btn" onClick={() => setDirection(d => d === 'H' ? 'V' : 'H')}>
-                  Rotate: {direction === 'H' ? '↔ Horizontal' : '↕ Vertical'} (R)
-                </button>
+                <div className="text-small" style={{ textAlign: 'center', color: 'var(--dim)', fontSize: 10, letterSpacing: 1 }}>
+                  Tap active ship to rotate · Drag to grid
+                </div>
                 <button className="btn btn-primary btn-sm btn-full" onClick={handleRandomPlace}>🎲 Random Place</button>
                 <button className="btn btn-danger btn-sm btn-full" onClick={handleReset}>↺ Reset</button>
                 <button className="btn btn-sm btn-full" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--dim)', border: '1px solid rgba(255,255,255,0.15)' }} onClick={startNewGame}>← Lobby</button>
