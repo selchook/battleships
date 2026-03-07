@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Peer from 'peerjs'
+import * as Ably from 'ably'
+
+const ABLY_KEY = 'Y_KB5A.nn1bNA:hqni-Pf3-MxM0d9OVRcehDNuRpIjk4RgTmQONkxkcDk'
 
 // ── constants ────────────────────────────────────────────────────────────────
 const GRID = 10
@@ -1064,8 +1066,10 @@ export default function App() {
   const [myRematch, setMyRematch] = useState(false)
   const [opponentRematch, setOpponentRematch] = useState(false)
 
-  const peerRef = useRef(null)
-  const connRef = useRef(null)
+  const ablyRef = useRef(null)
+  const channelRef = useRef(null)
+  const myRoleRef = useRef(null)   // 'host' | 'guest'
+  const handleMsgRef = useRef(null)
   const logRef = useRef(null)
 
   // Scroll log
@@ -1073,8 +1077,8 @@ export default function App() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [gameLog])
 
-  // Cleanup peer on unmount
-  useEffect(() => () => { peerRef.current?.destroy() }, [])
+  // Cleanup Ably on unmount
+  useEffect(() => () => { ablyRef.current?.close() }, [])
 
   const addLog = useCallback((msg, type = 'info') => {
     setGameLog(prev => [...prev.slice(-50), { msg, type, id: Date.now() + Math.random() }])
@@ -1091,51 +1095,48 @@ export default function App() {
     setTimeout(() => setEffects(prev => prev.filter(e => e.id !== id)), 800)
   }, [])
 
-  // ── PEER SETUP ──
-  const initPeer = useCallback((peerId) => {
-    const peer = new Peer(peerId, {
-      host: '0.peerjs.com', port: 443, path: '/', secure: true,
-      debug: 0, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-    })
-    peerRef.current = peer
+  // ── ABLY SETUP ──
+  const initAbly = useCallback((code, hosting) => {
+    const client = new Ably.Realtime({ key: ABLY_KEY })
+    ablyRef.current = client
+    myRoleRef.current = hosting ? 'host' : 'guest'
 
-    peer.on('open', (id) => {
-      setRoomCode(id)
-      setPeerReady(true)
-    })
+    client.connection.once('connected', () => {
+      const channel = client.channels.get(`bship-${code}`)
+      channelRef.current = channel
 
-    peer.on('connection', (conn) => {
-      setupConn(conn, true)
-    })
+      channel.subscribe('data', (msg) => {
+        if (msg.data.from === myRoleRef.current) return
+        handleMsgRef.current?.(msg.data)
+      })
 
-    peer.on('error', (err) => {
-      if (err.type === 'unavailable-id') {
-        // retry with random
-        peer.destroy()
-        initPeer(null)
+      if (hosting) {
+        setRoomCode(code)
+        setPeerReady(true)
+        channel.subscribe('join', () => {
+          setConnected(true)
+          setConnError('')
+          addLog('Opponent connected. Place your ships.', 'system')
+        })
       } else {
-        setConnError('Connection error: ' + err.message)
+        channel.publish('join', { from: 'guest' })
+        setConnected(true)
+        setConnError('')
+        addLog('Connected to room. Place your ships.', 'system')
       }
     })
-  }, [])
 
-  const setupConn = useCallback((conn, hosting) => {
-    connRef.current = conn
-    conn.on('open', () => {
-      setConnected(true)
-      setConnError('')
-      addLog('Opponent connected. Place your ships.', 'system')
+    client.connection.on('failed', (s) => {
+      setConnError('Connection failed: ' + (s.reason?.message || 'Unknown error'))
     })
-    conn.on('data', handleMessage)
-    conn.on('close', () => {
+    client.connection.on('disconnected', () => {
       setConnected(false)
       addLog('Opponent disconnected.', 'system')
     })
-    conn.on('error', (e) => setConnError(e.message))
-  }, [])
+  }, [addLog])
 
   const send = useCallback((data) => {
-    connRef.current?.send(data)
+    channelRef.current?.publish('data', { ...data, from: myRoleRef.current })
   }, [])
 
   const handleMessage = useCallback((data) => {
@@ -1221,20 +1222,15 @@ export default function App() {
     }
   }, [send, addLog, showToast])
 
-  // Re-bind handleMessage on conn open since closure is stale
-  useEffect(() => {
-    const conn = connRef.current
-    if (!conn) return
-    conn.off('data')
-    conn.on('data', handleMessage)
-  }, [handleMessage])
+  // Keep handleMsgRef current so Ably subscription always calls the latest handler
+  handleMsgRef.current = handleMessage
 
   const createRoom = () => {
     AudioEngine.init()
     setIsHost(true)
     setConnError('')
     const code = 'NS' + Math.random().toString(36).substring(2, 6).toUpperCase()
-    initPeer(code)
+    initAbly(code, true)
   }
 
   const joinRoom = () => {
@@ -1242,16 +1238,7 @@ export default function App() {
     AudioEngine.init()
     setIsHost(false)
     setConnError('')
-    const peer = new Peer(null, {
-      host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0,
-      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-    })
-    peerRef.current = peer
-    peer.on('open', () => {
-      const conn = peer.connect(inputCode.trim().toUpperCase(), { reliable: true })
-      setupConn(conn, false)
-    })
-    peer.on('error', e => setConnError('Could not connect: ' + e.message))
+    initAbly(inputCode.trim().toUpperCase(), false)
   }
 
   const copyCode = () => {
@@ -1436,20 +1423,11 @@ export default function App() {
   // Auto-join from URL param (?join=CODE)
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('join')?.toUpperCase()
-    if (!code || peerRef.current) return
+    if (!code || ablyRef.current) return
     setInputCode(code)
     setIsHost(false)
     setConnError('')
-    const peer = new Peer(null, {
-      host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0,
-      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-    })
-    peerRef.current = peer
-    peer.on('open', () => {
-      const conn = peer.connect(code, { reliable: true })
-      setupConn(conn, false)
-    })
-    peer.on('error', e => setConnError('Could not connect: ' + e.message))
+    initAbly(code, false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── RENDER ──
