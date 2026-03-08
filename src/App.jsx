@@ -1657,13 +1657,7 @@ export default function App() {
       {screen === 'battle' && (
         <div className="battle-screen">
           {/* HUD */}
-          <div className="battle-hud">
-            <div className="hud-section" style={{ visibility: 'hidden' }} />
-            <div className="hud-section" style={{ textAlign: 'center' }}>
-              <div className={`turn-indicator ${myTurn ? 'my-turn' : 'enemy-turn'}`}>
-                {myTurn ? '🎯 YOUR TURN — FIRE!' : '⏳ ENEMY TURN...'}
-              </div>
-            </div>
+          <div className="battle-hud" style={{ justifyContent: 'flex-end' }}>
             <div className="hud-section" style={{ textAlign: 'right' }}>
               <button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--dim)', border: '1px solid rgba(255,255,255,0.15)', fontSize: 10 }} onClick={startNewGame}>← LOBBY</button>
             </div>
@@ -1680,9 +1674,12 @@ export default function App() {
           <div className="boards-row">
             {/* My Board */}
             <div className="board-panel">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div className="board-title my" style={{ margin: 0 }}>⚓ MY WATERS</div>
                 <div className="hud-label" style={{ fontSize: 10 }}>FLEET: <span className={`hud-value ${SHIPS.length - countSunk(myGrid, myHits) <= 1 ? 'danger' : 'safe'}`} style={{ fontSize: 12 }}>{SHIPS.length - countSunk(myGrid, myHits)}/{SHIPS.length}</span></div>
+              </div>
+              <div className={`turn-indicator ${myTurn ? 'my-turn' : 'enemy-turn'}`} style={{ marginBottom: 10, fontSize: 10, padding: '4px 12px' }}>
+                {myTurn ? '🛡️ SAFE' : '💥 ENEMY FIRING'}
               </div>
               <BattleGrid
                 grid={myGrid}
@@ -1705,9 +1702,12 @@ export default function App() {
             {/* Enemy Board */}
             <div className="board-panel enemy-board" style={{ position: 'relative' }}>
               {myTurn && <div className="radar-ping" />}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div className="board-title enemy" style={{ margin: 0 }}>🎯 ENEMY WATERS</div>
                 <div className="hud-label" style={{ fontSize: 10 }}>FLEET: <span className={`hud-value ${stats.enemySunk >= 4 ? 'danger' : ''}`} style={{ fontSize: 12 }}>{SHIPS.length - stats.enemySunk}/{SHIPS.length}</span></div>
+              </div>
+              <div className={`turn-indicator ${myTurn ? 'my-turn' : 'enemy-turn'}`} style={{ marginBottom: 10, fontSize: 10, padding: '4px 12px' }}>
+                {myTurn ? '🎯 YOUR TURN — FIRE!' : '⏳ WAITING...'}
               </div>
               <BattleGrid
                 grid={enemyShipGrid}
