@@ -422,14 +422,41 @@ const CSS = `
   .grid-cell.preview-ok { background: rgba(0,212,255,0.15) !important; border-color: rgba(0,212,255,0.5) !important; }
   .grid-cell.preview-bad { background: rgba(255,56,56,0.15) !important; border-color: rgba(255,56,56,0.4) !important; }
   .grid-cell.hit {
-    background: radial-gradient(circle, rgba(255,100,0,0.6), rgba(180,20,0,0.4)) !important;
-    border-color: rgba(255,80,0,0.6) !important;
-    animation: hitPulse 0.4s ease-out;
+    background: radial-gradient(circle, rgba(255,100,0,0.55), rgba(180,20,0,0.4)) !important;
+    border-color: rgba(255,80,0,0.7) !important;
   }
   .grid-cell.hit::after {
-    content: '💥'; position: absolute; inset: 0;
+    content: '🔥'; position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; animation: none;
+    font-size: 16px; pointer-events: none;
+    animation: fireFlicker 0.35s ease-in-out infinite alternate;
+  }
+  @keyframes fireFlicker {
+    from { opacity: 0.75; transform: scale(0.9) translateY(1px); }
+    to   { opacity: 1;    transform: scale(1.1) translateY(-2px); }
+  }
+  /* Blow phase — initial explosion burst */
+  .grid-cell.hit.blow {
+    animation: blowFlash 0.65s ease-out forwards;
+    z-index: 10; position: relative;
+  }
+  .grid-cell.hit.blow::before {
+    content: '💥'; position: absolute; inset: 0; z-index: 3;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; pointer-events: none;
+    animation: blowEmoji 0.65s ease-out forwards;
+  }
+  .grid-cell.hit.blow::after { animation: none; opacity: 0; }
+  @keyframes blowFlash {
+    0%  { transform: scale(1.7); box-shadow: 0 0 24px 10px rgba(255,230,100,0.9); }
+    20% { transform: scale(1.35); box-shadow: 0 0 16px 5px rgba(255,120,0,0.7); }
+    60% { transform: scale(1.08); box-shadow: 0 0 6px 2px rgba(255,60,0,0.3); }
+    100%{ transform: scale(1);   box-shadow: none; }
+  }
+  @keyframes blowEmoji {
+    0%  { font-size: 30px; opacity: 1; transform: scale(1.2); }
+    55% { font-size: 25px; opacity: 0.85; }
+    100%{ font-size: 18px; opacity: 0; }
   }
   .grid-cell.miss {
     background: rgba(0,40,80,0.5) !important;
@@ -447,8 +474,6 @@ const CSS = `
     background: rgba(255,50,0,0.2) !important;
     border-color: rgba(255,80,0,0.5) !important;
   }
-  @keyframes hitPulse { 0%{transform:scale(1.3)} 100%{transform:scale(1)} }
-
   .grid-cell.my-turn-hover:hover {
     background: rgba(0,212,255,0.12) !important;
     border-color: var(--cyan) !important;
@@ -873,7 +898,7 @@ function ShipOverlay({ shipPlacements, hits, grid, cell, hdr }) {
 }
 
 // ── Grid component ────────────────────────────────────────────────────────────
-function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements, onCellTap, onCellLongPress }) {
+function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, hoverDirection, selectedShip, shipPlacements, onCellTap, onCellLongPress, blowCells }) {
   // mode: 'placement' | 'my-board' | 'enemy-board'
   const tableRef = useRef(null)
   // Always-current callback ref — solves stale closure issues across re-renders
@@ -966,6 +991,7 @@ function BattleGrid({ grid, hits, mode, onCellClick, onCellHover, hoveredCell, h
         classes.push('sunk')
       } else {
         classes.push('hit')
+        if (blowCells?.has(`${r}-${c}`)) classes.push('blow')
       }
     } else if (h === 'miss') {
       classes.push('miss')
@@ -1060,6 +1086,8 @@ export default function App() {
   const [myTurn, setMyTurn] = useState(false)
   const [gameLog, setGameLog] = useState([])
   const [effects, setEffects] = useState([])
+  const [myBlowCells, setMyBlowCells] = useState(new Set())
+  const [enemyBlowCells, setEnemyBlowCells] = useState(new Set())
   const [toast, setToast] = useState(null)
   const [endResult, setEndResult] = useState(null) // 'win' | 'lose'
   const [stats, setStats] = useState({ myShots: 0, myHitsCount: 0, enemySunk: 0, mySunk: 0 })
@@ -1093,6 +1121,13 @@ export default function App() {
     const id = Date.now() + Math.random()
     setEffects(prev => [...prev, { id, x, y, type }])
     setTimeout(() => setEffects(prev => prev.filter(e => e.id !== id)), 800)
+  }, [])
+
+  const addBlowCell = useCallback((board, r, c) => {
+    const key = `${r}-${c}`
+    const setter = board === 'my' ? setMyBlowCells : setEnemyBlowCells
+    setter(prev => new Set([...prev, key]))
+    setTimeout(() => setter(prev => { const n = new Set(prev); n.delete(key); return n }), 700)
   }, [])
 
   // ── ABLY SETUP ──
@@ -1158,6 +1193,7 @@ export default function App() {
             const sunk = checkSunk(shipId, prev, newH)
             send({ type: 'shot-result', r, c, hit: true, miss: false, sunk: sunk ? shipId : null, shipGrid: sunk ? prev : null })
             AudioEngine.init(); AudioEngine.play(sunk ? 'sink' : 'hit')
+            addBlowCell('my', r, c)
             addLog(`Enemy hit ${cols[c]}${r+1}${sunk ? ` — ${shipId.toUpperCase()} SUNK!` : '!'}`, sunk ? 'sunk' : 'hit')
             setStats(s => ({ ...s, mySunk: s.mySunk + (sunk ? 1 : 0) }))
             // Hit: enemy keeps shooting — don't flip myTurn
@@ -1193,12 +1229,14 @@ export default function App() {
       if (sunk && shipGrid) {
         setEnemyShipGrid(shipGrid)
         AudioEngine.init(); AudioEngine.play('sink')
+        addBlowCell('enemy', r, c)
         addLog(`💥 You sank their ${sunk.toUpperCase()}! Fire again!`, 'sunk')
         showToast(`${sunk.toUpperCase()} SUNK! KEEP FIRING!`, 'sunk')
         setStats(s => ({ ...s, enemySunk: s.enemySunk + 1, myHitsCount: s.myHitsCount + 1 }))
         setMyTurn(true) // hit → keep shooting
       } else if (hit) {
         AudioEngine.init(); AudioEngine.play('hit')
+        addBlowCell('enemy', r, c)
         addLog(`Hit at ${cols[c]}${r+1}! Fire again!`, 'hit')
         showToast('DIRECT HIT! FIRE AGAIN!', 'hit')
         setStats(s => ({ ...s, myHitsCount: s.myHitsCount + 1 }))
@@ -1220,7 +1258,7 @@ export default function App() {
     if (data.type === 'rematch') {
       setOpponentRematch(true)
     }
-  }, [send, addLog, showToast])
+  }, [send, addLog, showToast, addBlowCell])
 
   // Keep handleMsgRef current so Ably subscription always calls the latest handler
   handleMsgRef.current = handleMessage
@@ -1686,6 +1724,7 @@ export default function App() {
                 hits={myHits}
                 mode="my-board"
                 shipPlacements={myShipPlacements}
+                blowCells={myBlowCells}
               />
               <div className="ship-status-row">
                 {SHIPS.map(s => {
@@ -1715,6 +1754,7 @@ export default function App() {
                 mode="enemy-board"
                 onCellClick={myTurn ? handleShot : undefined}
                 shipPlacements={enemyShipPlacements}
+                blowCells={enemyBlowCells}
               />
               <div className="ship-status-row">
                 {SHIPS.map(s => {
