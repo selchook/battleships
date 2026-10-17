@@ -14,6 +14,17 @@ A real-time multiplayer Battleships game inspired by Warships Online, built with
 - 📱 **Mobile responsive** layout
 - 🌊 **Warships Online-inspired** dark navy aesthetic
 
+## Ably Setup
+
+Realtime messaging uses [Ably](https://ably.com) with **token auth**: the API key stays on the
+server, and `/api/ably-token` hands each player a short-lived token that can only publish/subscribe
+to its own room channel (`bship-<CODE>`).
+
+- **Vercel**: Project → Settings → Environment Variables → add `ABLY_API_KEY`
+- **Local**: copy `.env.example` to `.env.local` and set `ABLY_API_KEY`
+
+Never prefix it with `VITE_`: that would bundle the key into the client.
+
 ## Deploy to Vercel
 
 ### Option 1: Vercel CLI

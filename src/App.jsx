@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import * as Ably from 'ably'
 
-const ABLY_KEY = 'Y_KB5A.nn1bNA:hqni-Pf3-MxM0d9OVRcehDNuRpIjk4RgTmQONkxkcDk'
-
 // ── constants ────────────────────────────────────────────────────────────────
 const GRID = 10
 const SHIPS = [
@@ -1132,7 +1130,8 @@ export default function App() {
 
   // ── ABLY SETUP ──
   const initAbly = useCallback((code, hosting) => {
-    const client = new Ably.Realtime({ key: ABLY_KEY })
+    // Token auth: the server signs a short-lived token scoped to this room's channel
+    const client = new Ably.Realtime({ authUrl: '/api/ably-token', authParams: { room: code } })
     ablyRef.current = client
     myRoleRef.current = hosting ? 'host' : 'guest'
 
