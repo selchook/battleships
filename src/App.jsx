@@ -1163,8 +1163,10 @@ export default function App() {
     client.connection.on('failed', (s) => {
       setConnError('Connection failed: ' + (s.reason?.message || 'Unknown error'))
     })
-    client.connection.on('disconnected', () => {
+    client.connection.on('disconnected', (s) => {
       setConnected(false)
+      // Auth errors (e.g. token endpoint failing) surface here and are retried silently, so show them
+      if (s.reason) setConnError('Connection error: ' + s.reason.message)
       addLog('Opponent disconnected.', 'system')
     })
   }, [addLog])
